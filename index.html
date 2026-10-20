@@ -1,0 +1,1231 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>[hidden]{display:none!important}body{margin:0}</style>
+<title>バド戦術3Dクイズ</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* Layout: one-screen game — 3D court with on-court shot bar (left/top), coaching panel (right/bottom); menus as overlays */
+:root{
+  --bg:#eaf0ec; --panel:#ffffff; --ink:#13201a; --muted:#5a6b62; --line:#d3ddd7;
+  --accent:#0d6b4a; --accent-ink:#ffffff; --mine:#2f5fd0; --pt:#3f8fe0; --opp:#d94e32;
+  --inc:#e8b400; --ok:#17924f; --ng:#cf3a3a; --warn:#c98a00; --chip:#e4ece7; --stage:#dfe7e2;
+  --display:'Dela Gothic One','Hiragino Kaku Gothic StdN','Yu Gothic',sans-serif;
+  --body:'Zen Kaku Gothic New','Hiragino Sans','Yu Gothic','Meiryo',sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0d1511; --panel:#141e19; --ink:#e6eee9; --muted:#93a69b; --line:#24332b;
+  --accent:#3fbf8a; --accent-ink:#06120c; --mine:#6e95ff; --pt:#8cc3ff; --opp:#ff7a5c;
+  --inc:#f5c832; --ok:#3fcf82; --ng:#ff6b6b; --warn:#f0b43c; --chip:#1c2a23; --stage:#101a15; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0d1511; --panel:#141e19; --ink:#e6eee9; --muted:#93a69b; --line:#24332b;
+  --accent:#3fbf8a; --accent-ink:#06120c; --mine:#6e95ff; --pt:#8cc3ff; --opp:#ff7a5c;
+  --inc:#f5c832; --ok:#3fcf82; --ng:#ff6b6b; --warn:#f0b43c; --chip:#1c2a23; --stage:#101a15; color-scheme:dark}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);overflow:hidden;font-size:15px;line-height:1.6}
+*{box-sizing:border-box}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+#app{height:100%;display:flex;flex-direction:column}
+.bar{display:flex;align-items:center;gap:12px;padding-block:9px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));border-bottom:1px solid var(--line);background:var(--panel)}
+.logo{font-family:var(--display);font-size:17px;white-space:nowrap}
+.logo b{color:var(--accent);font-weight:400}
+.hud{margin-left:auto;display:flex;gap:8px;align-items:center}
+.iconbtn{background:none;border:1px solid var(--line);border-radius:8px;padding:4px 10px;font-size:13px}
+.main{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,400px)}
+#stage{position:relative;min-height:0;background:var(--stage);overflow:hidden}
+#cv{display:block;width:100%;height:100%;touch-action:none;-webkit-user-select:none;user-select:none}
+.views{position:absolute;right:max(10px,env(safe-area-inset-right,0px));top:10px;display:flex;gap:5px}
+.views button{background:color-mix(in srgb,var(--panel) 88%,transparent);border:1px solid var(--line);border-radius:8px;padding:3px 9px;font-size:12px}
+.views button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.legend{position:absolute;left:max(10px,env(safe-area-inset-left,0px));top:10px;display:flex;gap:9px;flex-wrap:wrap;font-size:11px;background:color-mix(in srgb,var(--panel) 85%,transparent);border-radius:8px;padding:3px 9px;max-width:60%}
+.legend span{display:inline-flex;align-items:center;gap:4px}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+#toast{position:absolute;left:50%;top:46px;transform:translateX(-50%);max-width:min(92%,460px);padding:8px 14px;border-radius:12px;background:color-mix(in srgb,var(--panel) 94%,transparent);border:1.5px solid var(--line);font-weight:700;font-size:14px;text-align:center;pointer-events:none;transition:opacity .25s;opacity:0}
+#toast.show{opacity:1}
+#toast .g{margin-right:6px}
+#cue{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);font-family:var(--display);font-size:clamp(22px,5vw,34px);color:#fff;text-shadow:0 2px 10px rgba(0,0,0,.45);pointer-events:none;opacity:0;transition:opacity .15s;white-space:nowrap}
+#cue.show{opacity:1}
+#miss{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%) scale(.9);display:grid;justify-items:center;gap:4px;padding:12px 22px;border-radius:16px;background:var(--ng);color:#fff;pointer-events:none;opacity:0;transition:opacity .15s,transform .15s;text-align:center;max-width:88%;box-shadow:0 10px 30px -10px rgba(0,0,0,.5)}
+#miss.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+#miss b{font-family:var(--display);font-weight:400;font-size:clamp(24px,6vw,36px);line-height:1.1}
+#miss span{font-size:13px;font-weight:700}
+#miss.opp{background:var(--accent);color:var(--accent-ink)}
+#ctl{position:relative;display:grid;gap:4px;padding-block:9px 9px;padding-left:max(10px,env(safe-area-inset-left,0px));padding-right:max(10px,env(safe-area-inset-right,0px));background:var(--panel);border-top:1px solid var(--line)}
+.left{display:flex;flex-direction:column;min-height:0;min-width:0}
+.left #stage{flex:1}
+.ctlrow{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:center}
+.tbar{position:absolute;left:0;right:0;top:0;height:4px;background:color-mix(in srgb,var(--ink) 10%,transparent);overflow:visible;visibility:hidden}
+#ctl.live .tbar{visibility:visible}
+.tbar i{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--ok)}
+.tbar.over i{background:var(--ng)}
+.tbar span{position:absolute;right:10px;top:-20px;background:var(--panel);padding:0 6px;border-radius:6px;font-size:11px;font-weight:700;color:var(--ng)}
+.aimrow{display:grid;grid-template-columns:repeat(3,34px);gap:4px;align-items:center}
+.aimrow span{grid-column:1/-1;font-size:10px;font-weight:700;color:var(--muted);text-align:center;line-height:1}
+.aimrow button{border:1px solid var(--line);background:var(--bg);border-radius:8px;height:30px;padding:0;font-size:12px;font-weight:700}
+.aimrow button[aria-pressed="true"]{border-color:var(--mine);background:var(--mine);color:#fff}
+.shots{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
+@media (min-width:1100px){.shots{grid-template-columns:repeat(8,minmax(0,1fr))}}
+.shot{border:none;border-radius:10px;padding:7px 2px;font-weight:700;font-size:13px;background:var(--panel);color:var(--ink);box-shadow:0 2px 0 var(--line);display:flex;flex-direction:column;align-items:center;gap:1px;line-height:1.25}
+.shot kbd{font-family:var(--body);font-size:10px;color:var(--muted);font-weight:500}
+.shot:disabled{opacity:.42;cursor:default}
+#ctl.live .shot.fit{background:var(--mine);color:#fff;box-shadow:0 3px 0 color-mix(in srgb,var(--mine) 60%,#000)}
+#ctl.live .shot.off{background:var(--panel);color:var(--muted);box-shadow:0 2px 0 var(--line);outline:1.5px dashed var(--line);outline-offset:-3px}
+#ctl.live .shot.fit kbd{color:rgba(255,255,255,.8)}
+#ctl.live .shot:not(:disabled):active{transform:translateY(2px);box-shadow:none}
+#panel{overflow-y:auto;padding-block:16px 22px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));border-left:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;gap:12px;min-width:0}
+.tags{display:flex;gap:6px;flex-wrap:wrap}
+.tag{font-size:12px;font-weight:700;padding:2px 9px;border-radius:6px;background:var(--chip);letter-spacing:.04em}
+.tag.lv1{color:var(--ok)} .tag.lv2{color:var(--warn)} .tag.lv3{color:var(--ng)}
+.qtitle{font-family:var(--display);font-weight:400;font-size:20px;line-height:1.35;margin:0;text-wrap:balance}
+.sit{margin:0}
+.ask{font-weight:700;margin:0;color:var(--accent)}
+.score{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;background:var(--bg);border-radius:14px;padding:10px 14px}
+.score .nm{font-size:12px;font-weight:700;color:var(--muted);display:flex;align-items:center;gap:5px}
+.score .nm.r{justify-content:flex-end}
+.score .pts{font-family:var(--display);font-size:38px;line-height:1;font-variant-numeric:tabular-nums}
+.score .pts.r{text-align:right}
+.score .mid{font-size:12px;color:var(--muted);text-align:center}
+.srv{width:8px;height:8px;border-radius:50%;background:var(--inc);display:inline-block;visibility:hidden}
+.srv.on{visibility:visible}
+.status{font-weight:700;padding:8px 12px;border-radius:10px;background:var(--chip);font-size:14px}
+.status.go{background:var(--mine);color:#fff}
+.feedh{font-size:12px;font-weight:700;letter-spacing:.08em;color:var(--muted);margin:4px 0 0}
+.feed{display:grid;gap:6px;margin:0;padding:0;list-style:none}
+.feed li{display:grid;grid-template-columns:26px 1fr;gap:6px;font-size:13px;padding:6px 8px;border-radius:8px;background:var(--bg)}
+.gb{font-weight:700;text-align:center}
+.g-best{color:var(--ok)} .g-good{color:var(--accent)} .g-meh{color:var(--warn)} .g-bad{color:var(--ng)} .g-info{color:var(--muted)}
+.help{font-size:12px;color:var(--muted);margin:0;padding-left:1.1em}
+.fb{border-radius:12px;padding:14px;display:grid;gap:8px;border:1.5px solid var(--line)}
+.fb.ok,.fb.best{border-color:var(--ok)} .fb.ng,.fb.bad{border-color:var(--ng)} .fb.good{border-color:#2f5fd0}
+.fb h3{margin:0;font-family:var(--display);font-weight:400;font-size:19px}
+.fb.ok h3,.fb.best h3{color:var(--ok)} .fb.ng h3,.fb.bad h3{color:var(--ng)} .fb.good h3{color:#2f5fd0}
+.fb p{margin:0}
+.cmp{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-size:14px}
+.cmp dt{color:var(--muted);font-size:12px;font-weight:700;padding-top:2px}
+.cmp dd{margin:0;font-weight:700}
+.point{background:var(--chip);border-radius:8px;padding:8px 10px;font-weight:700;font-size:14px}
+.point::before{content:"ポイント";display:block;font-size:11px;letter-spacing:.1em;color:var(--muted)}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.btn{border:none;border-radius:10px;padding:10px 18px;font-weight:700;background:var(--accent);color:var(--accent-ink)}
+.btn.sub{background:var(--chip);color:var(--ink)}
+.btn:disabled{opacity:.4}
+.overlay{position:fixed;inset:0;z-index:20;overflow-y:auto;background:color-mix(in srgb,var(--bg) 82%,transparent);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);padding-top:calc(env(safe-area-inset-top,0px) + 20px);padding-bottom:calc(env(safe-area-inset-bottom,0px) + 20px);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;justify-content:center;align-items:flex-start}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:22px;max-width:560px;width:100%;display:grid;gap:16px;box-shadow:0 20px 50px -24px rgba(0,0,0,.35);margin-block:auto}
+.hero h1{font-family:var(--display);font-weight:400;font-size:clamp(25px,6vw,34px);line-height:1.2;margin:0;text-wrap:balance}
+.hero p{margin:6px 0 0;color:var(--muted)}
+.eyebrow{font-size:12px;letter-spacing:.14em;font-weight:700;color:var(--accent)}
+.modes{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.mode{border:2px solid var(--line);background:var(--bg);border-radius:14px;padding:12px;text-align:left;display:grid;gap:2px}
+.mode b{font-family:var(--display);font-weight:400;font-size:17px}
+.mode span{font-size:12px;color:var(--muted);line-height:1.45}
+.mode[aria-pressed="true"]{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,var(--bg))}
+.field{display:grid;gap:6px}
+.flabel{font-size:12px;font-weight:700;letter-spacing:.08em;color:var(--muted)}
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:4px;background:var(--chip);border-radius:10px;padding:4px}
+.seg button{border:none;background:none;border-radius:7px;padding:8px 4px;font-weight:700;font-size:14px}
+.seg button[aria-pressed="true"]{background:var(--panel);color:var(--accent);box-shadow:0 1px 3px rgba(0,0,0,.15)}
+.live2{display:grid;gap:8px}
+.seg.sm button{padding:5px 2px;font-size:12px}
+.seg.grid3{grid-auto-flow:row;grid-template-columns:repeat(3,1fr)}
+.seg.grid3 .wide{grid-column:1/-1}
+.seg small{font-size:10px;font-weight:500;color:var(--muted)}
+.pick{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px}
+.pick label{display:grid;gap:3px;font-size:12px;font-weight:700;color:var(--muted);min-width:0}
+select{font:inherit;font-size:14px;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);width:100%;min-width:0}
+.cmpbars{display:grid;gap:5px;font-size:12px;background:var(--bg);border-radius:12px;padding:10px 12px}
+.cbh{display:flex;justify-content:space-between;font-weight:700;font-size:12px;gap:8px}
+.cbh .a{color:var(--mine)} .cbh .b{color:var(--opp);text-align:right}
+.cb{display:grid;grid-template-columns:2em 1fr 6.2em 1fr 2em;gap:6px;align-items:center;font-variant-numeric:tabular-nums}
+.cb .k{text-align:center;color:var(--muted);font-weight:700;font-size:11px}
+.cb .v{font-weight:700;text-align:center}
+.cbar{height:8px;border-radius:4px;background:var(--chip);position:relative;overflow:hidden}
+.cbar i{position:absolute;top:0;bottom:0;right:0;background:var(--mine);border-radius:4px}
+.cbar.o i{left:0;right:auto;background:var(--opp)}
+.mom{display:inline-block;font-size:11px;font-weight:700;padding:1px 7px;border-radius:999px;margin-top:4px}
+.mom.up{background:color-mix(in srgb,var(--ok) 18%,transparent);color:var(--ok)}
+.mom.dn{background:color-mix(in srgb,var(--ng) 15%,transparent);color:var(--ng)}
+.radar{width:100%;max-width:420px;height:auto;display:block;margin:0 auto;overflow:visible}
+.rsum{display:grid;gap:2px;font-size:12px;text-align:center}
+.rsum b{font-size:13px}
+.rsum span{color:var(--muted)}
+.cbnote{font-size:11px;color:var(--muted);margin:2px 0 0}
+.chk{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700}
+.chk input{width:18px;height:18px;accent-color:var(--accent)}
+.meta{font-size:13px;color:var(--muted);display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.howto{font-size:13px;color:var(--muted);margin:0;padding-left:1.2em}
+.big{font-family:var(--display);font-size:52px;line-height:1;font-variant-numeric:tabular-nums}
+.big small{font-size:22px;color:var(--muted)}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center}
+.stats div{background:var(--bg);border-radius:10px;padding:8px 4px;font-size:12px;color:var(--muted)}
+.stats b{display:block;font-size:22px;font-family:var(--display);font-weight:400}
+.review{display:grid;gap:6px;max-height:36vh;overflow-y:auto}
+.rv{display:grid;grid-template-columns:24px 1fr;gap:8px;padding:8px 10px;border-radius:8px;background:var(--bg);font-size:13px}
+.rv .m{font-weight:700} .rv .m.ok{color:var(--ok)} .rv .m.ng{color:var(--ng)}
+.rv b{display:block;font-size:14px}
+.rv span{color:var(--muted)}
+@media (max-width:820px){
+  .main{grid-template-columns:minmax(0,1fr);grid-template-rows:66% minmax(0,1fr)}
+  #panel{border-left:none;border-top:1px solid var(--line);padding-block:12px 18px}
+  .qtitle{font-size:17px}
+  .logo{font-size:15px}
+  .score .pts{font-size:30px}
+  .shot{padding:7px 1px;font-size:11px;letter-spacing:-.02em;white-space:nowrap}
+  .shot kbd{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+
+<div id="app">
+  <header class="bar">
+    <div class="logo">バド戦術<b>3D</b>クイズ</div>
+    <div class="hud"><button class="iconbtn" id="quitBtn" type="button" hidden>メニュー</button></div>
+  </header>
+  <main class="main">
+    <div class="left">
+    <div id="stage">
+      <canvas id="cv" aria-label="バドミントンコートの3D表示。自分のコートをタップで移動、相手コートをタップで狙いを決める"></canvas>
+      <div class="legend">
+        <span><i class="dot" style="background:var(--mine)"></i>あなた</span>
+        <span id="lgPt"><i class="dot" style="background:var(--pt)"></i>味方</span>
+        <span><i class="dot" style="background:var(--opp)"></i>相手</span>
+        <span><i class="dot" style="background:var(--inc)"></i>来る球</span>
+      </div>
+      <div class="views" role="group" aria-label="視点">
+        <button type="button" data-v="back" aria-pressed="true">後方</button>
+        <button type="button" data-v="top" aria-pressed="false">真上</button>
+        <button type="button" data-v="side" aria-pressed="false">横</button>
+      </div>
+      <div id="toast"></div>
+      <div id="cue">今だ！ショット！</div>
+      <div id="miss" role="status"><b>ショットミス！</b><span id="missSub"></span></div>
+    </div>
+      <div id="ctl" hidden>
+        <div class="tbar" id="tbarWrap"><i id="tbar"></i><span id="tbarTxt"></span></div>
+        <div class="ctlrow">
+          <div class="aimrow" id="aimRow"><span>狙い</span>
+            <button type="button" data-ax="-1" aria-label="左を狙う">◀</button>
+            <button type="button" data-ax="0" aria-pressed="true" aria-label="中央を狙う">中</button>
+            <button type="button" data-ax="1" aria-label="右を狙う">▶</button>
+          </div>
+          <div class="shots" id="shots"></div>
+        </div>
+      </div>
+    </div>
+    <section id="panel" aria-live="polite"></section>
+  </main>
+</div>
+
+<div id="start" class="overlay">
+  <div class="card">
+    <div class="hero">
+      <div class="eyebrow">BADMINTON TACTICS 3D</div>
+      <h1>動いて、選んで、打つ。</h1>
+      <p>自分で選手を動かし、シャトルが届く瞬間にショットを選びます。打つたびに「その判断が良かったか」をコーチが教えます。</p>
+    </div>
+    <div class="modes" id="modeSel">
+      <button type="button" class="mode" data-v="rally"><b>ラリー対戦</b><span>部員やCPUを選んで試合。能力が精度や決定率に反映</span></button>
+      <button type="button" class="mode" data-v="scn"><b>シーン練習</b><span>34の場面を実際に打って正解判定</span></button>
+    </div>
+    <div class="field">
+      <span class="flabel">種目</span>
+      <div class="seg" id="segFmt">
+        <button type="button" data-v="S">シングルス</button>
+        <button type="button" data-v="D">ダブルス</button>
+        <button type="button" data-v="A" id="fmtA">両方</button>
+      </div>
+    </div>
+    <div class="field" id="fChar">
+      <div class="pick"><div class="field"><span class="flabel">自分の性別</span>
+      <div class="seg" id="segSex"><button type="button" data-v="m">男子</button><button type="button" data-v="f">女子</button></div></div>
+      <div class="field"><span class="flabel">相手の性別</span>
+      <div class="seg" id="segSexO"><button type="button" data-v="m">男子</button><button type="button" data-v="f">女子</button></div></div></div>
+      <span class="flabel" style="margin-top:6px">相手のレベル</span>
+      <div class="seg grid3" id="segOpp">
+        <button type="button" data-v="c1">ビギナー</button>
+        <button type="button" data-v="c2">地区大会<br><small>2部ベスト16</small></button>
+        <button type="button" data-v="c3">胆振大会<br><small>守備型</small></button>
+        <button type="button" data-v="c4">胆振大会<br><small>攻撃型</small></button>
+        <button type="button" data-v="c5">全道大会</button>
+        <button type="button" data-v="c6">全道トップ</button>
+        <button type="button" data-v="club" class="wide">部員と対戦（生徒同士）</button>
+      </div>
+      <span class="flabel" style="margin-top:6px">選手を選ぶ（部員の能力を反映）</span>
+      <div class="pick"><label>あなた<select id="selMe"></select></label><label id="lbPt">味方（ダブルス）<select id="selPt"></select></label></div>
+      <div class="pick" id="pickOpp"><label>相手<select id="selOpp"></select></label><label id="lbOpp2">相手2（ダブルス）<select id="selOpp2"></select></label></div>
+      <div class="cmpbars" id="cmpBars"></div>
+    </div>
+    <div class="field" id="fLv">
+      <span class="flabel">難易度</span>
+      <div class="seg" id="segLv">
+        <button type="button" data-v="1">初級</button>
+        <button type="button" data-v="2">中級</button>
+        <button type="button" data-v="3">上級</button>
+        <button type="button" data-v="0" id="lvAll">すべて</button>
+      </div>
+    </div>
+    <div class="field" id="fPts">
+      <span class="flabel">試合の点数</span>
+      <div class="seg" id="segPts">
+        <button type="button" data-v="7">7点</button>
+        <button type="button" data-v="11">11点</button>
+        <button type="button" data-v="15">15点</button>
+        <button type="button" data-v="21">21点</button>
+      </div>
+    </div>
+    <div class="field" id="fN">
+      <span class="flabel">問題数</span>
+      <div class="seg" id="segN">
+        <button type="button" data-v="5">5問</button>
+        <button type="button" data-v="10">10問</button>
+        <button type="button" data-v="99">全問</button>
+      </div>
+    </div>
+    <div class="field">
+      <span class="flabel">球の速さ</span>
+      <div class="seg" id="segSpd">
+        <button type="button" data-v="0.6">ゆっくり</button>
+        <button type="button" data-v="0.8">やや遅い</button>
+        <button type="button" data-v="1">ふつう</button>
+        <button type="button" data-v="1.25">速い</button>
+      </div>
+    </div>
+    <div class="field">
+      <span class="flabel">打つ瞬間のスロー</span>
+      <div class="seg" id="segSlow">
+        <button type="button" data-v="0.08">強</button>
+        <button type="button" data-v="0.18">中</button>
+        <button type="button" data-v="0.4">弱</button>
+        <button type="button" data-v="1">なし</button>
+      </div>
+    </div>
+    <label class="chk" id="fAssist"><input type="checkbox" id="assist"> 移動アシスト（落下点の表示と自動で寄る）</label>
+    <div class="meta"><span id="avail"></span><span id="bestTxt"></span></div>
+    <button class="btn" id="goBtn" type="button" style="padding:14px">スタート</button>
+    <ul class="howto">
+      <li><b>移動</b>：自分のコートをタップ（PCは WASD / 矢印キー）</li>
+      <li><b>狙い</b>：相手コートをタップ、または「左・中央・右」（PCは J / K / L）</li>
+      <li><b>ショット</b>：シャトルが届く範囲に入るとスローになり、ボタンが青く光ります（PCは 1〜8）</li>
+      <li>球の高さで打てるショットが変わります（上から：スマッシュ等／中段：ドライブ・プッシュ／低い：ロブ・ヘアピン）</li>
+    </ul>
+  </div>
+</div>
+
+<div id="result" class="overlay" hidden>
+  <div class="card" id="resCard"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(() => {
+const RAW = [
+// ---------- シングルス ----------
+['S',1,'追い込まれたら','相手の速いクリアで、自分の左奥（バック奥）に追い込まれた。体勢は崩れ気味。相手はコート中央で構えている。',
+ {me:[-2.2,6.1],o:[[0,-3.4]]},{f:[0,-3.6],t:[-2.2,6.1],k:'clear'},
+ [['高く深いクリアで相手を奥へ下げる',[-2.0,-6.3],'clear'],['全力でスマッシュを打つ',[0.4,-3.8],'smash'],['ネット際へ速いカットを落とす',[1.6,-2.3],'drop'],['低く速いドライブで返す',[0,-3.2],'drive']],
+ '崩れた体勢から攻めると球が甘くなり、相手に決められやすくなります。高く深いクリアで時間を作り、その間にホームポジションへ戻るのが最優先です。','苦しいときは「高く・深く」で立て直す'],
+['S',1,'浅く甘い球','相手がネット前から苦し紛れに上げた球。浅くて高さも低め。相手はまだネット前にいる。',
+ {me:[0.3,3.8],o:[[1.2,-2.3]]},{f:[1.2,-2.3],t:[0.3,3.8],k:'lob',pk:4.6},
+ [['相手から遠い左サイドへスマッシュ',[-2.3,-4.2],'smash'],['ハイクリアで奥へ返す',[0,-6.3],'clear'],['相手がいるネット前へドロップ',[1.1,-2.2],'drop'],['相手の正面へドライブ',[1.2,-2.6],'drive']],
+ '浅くて低い球は最大のチャンスです。相手が前に残っているうちに、相手から遠いサイドへ角度のあるスマッシュで決めにいきます。クリアで返すと相手に立て直す時間を与えてしまいます。','浅い球は「打ち込む」'],
+['S',1,'ヘアピンに詰められた','相手がネット前にヘアピンを打ち、そのまま前に詰めている。シャトルはネットより下。',
+ {me:[0.4,2.4],o:[[0.3,-2.3]]},{f:[0.3,-2.3],t:[0.4,2.4],k:'net'},
+ [['高く深いロブで相手を奥へ下げる',[0,-6.3],'lob'],['ヘアピンでネット前に返す',[0.4,-2.1],'net'],['低いドライブで返す',[-1.2,-3.2],'drive'],['相手の正面に軽く返す',[0.3,-2.8],'push']],
+ '相手がネット前に詰めているとき、ネットより低い球を前に返すとプッシュで叩かれます。高く深いロブで相手を後ろへ下げ、自分も中央へ戻る時間を作りましょう。','相手が前に詰めていたら「奥へ」'],
+['S',1,'打った後の構え','奥へクリアを打った。次の返球に備えて、どこで構える？',
+ {me:[0,6.0],o:[[0,-5.6]]},{f:[0,6.0],t:[0,-5.6],k:'clear'},
+ [['コート中央のホームポジション',[0,3.4],'move'],['打った場所（後ろ）に残る',[0,6.0],'move'],['ネット前まで出る',[0,2.2],'move'],['右サイドライン際',[2.4,3.4],'move']],
+ 'ホームポジションは、前後左右どこへでも同じくらいの歩数で動ける場所です。打ったらすぐ戻る習慣が、シングルスで振り回されない土台になります。','打ったら「戻る」までがワンセット'],
+['S',1,'相手が奥にいる','相手を左奥へ追い込んだ。返球はやや短めのクリアで、相手はまだ奥にいる。',
+ {me:[0.3,4.6],o:[[-1.9,-5.9]]},{f:[-1.9,-5.9],t:[0.3,4.6],k:'clear',pk:5.5},
+ [['相手と反対側のネット前へドロップ',[1.8,-2.3],'drop'],['相手のいる左奥へクリア',[-2.0,-6.3],'clear'],['相手の正面へスマッシュ',[-1.8,-5.0],'smash'],['センターへドライブ',[0,-3.2],'drive']],
+ '相手を奥へ追い込んだら、ネット前は大きく空いています。相手から一番遠い対角線の前へ落とすと、相手が走る距離が最も長くなります。','相手の「いない所」へ。対角線が一番遠い'],
+['S',1,'シングルスのサービス','シングルスでサービスを打つ。相手は中央付近で構えている。基本となるサービスは？',
+ {me:[0.6,2.4],o:[[-0.6,-3.3]]},null,
+ [['高く深いロングサービス',[-0.5,-6.5],'lob'],['ネットすれすれのショートサービス',[-0.5,-2.1],'net'],['低く速いドライブサービス',[-1.6,-4.0],'drive'],['相手の正面へ中途半端な高さで',[-0.6,-3.3],'push']],
+ 'シングルスは前後に長いコートを1人で守ります。高く深いサービスは相手を一番奥まで下げ、真上から落ちてくるので強打されにくくなります。ショートも使えますが、基本はロングです。','シングルスのサービスは「高く・奥へ」'],
+['S',2,'空いているコース','右奥で余裕を持って上から打てる。相手はやや左（自分から見て）に寄っている。',
+ {me:[2.2,5.4],o:[[-0.7,-3.4]]},{f:[-0.7,-3.6],t:[2.2,5.4],k:'clear'},
+ [['ストレート（右サイド）へスマッシュ',[2.3,-4.2],'smash'],['クロス（左サイド）へスマッシュ',[-2.3,-4.0],'smash'],['ハイクリアをセンター奥へ',[0,-6.3],'clear'],['相手正面のハーフへドロップ',[-0.6,-3.0],'drop']],
+ '相手が左に寄っているので右サイドが空いています。ストレートはクロスより飛ぶ距離が短く、相手に届くまでの時間も短くなります。「空いている」と「距離が短い」が重なるコースが最も取りにくい一本です。','「空いている所」と「短い距離」が重なるコース'],
+['S',2,'スマッシュを切り返す','相手が右奥から強いスマッシュを打ってきた。自分は中央で低く構えている。',
+ {me:[0.3,3.6],o:[[1.6,-5.6]]},{f:[1.6,-5.6],t:[0.3,3.6],k:'smash',h1:0.8},
+ [['クロスのネット前へ短く返す',[-1.8,-2.2],'net'],['ストレートのネット前へ返す',[1.6,-2.2],'net'],['高いロブを右奥へ',[1.4,-6.3],'lob'],['相手の正面へドライブ',[1.6,-4.6],'drive']],
+ '相手は右奥から打った直後で、前への戻りが遅れます。相手の位置から最も遠いクロスのネット前へ落とせば、攻守を入れ替えるきっかけになります。ロブも安全ですが、また攻められる展開が続きます。','スマッシュは「相手から遠い前」へ返して切り返す'],
+['S',2,'ネット前で浮いた球','相手のネット前の返球が浮いた（ネットより上）。相手は中央まで下がっている。',
+ {me:[0.1,2.4],o:[[0,-3.6]]},{f:[0.3,-2.4],t:[0.1,2.4],k:'net',h1:1.75},
+ [['相手の横（空いたサイド）へプッシュ',[-2.2,-3.9],'push'],['相手の正面へプッシュ',[0,-3.6],'push'],['ヘアピンで前に落とす',[0.3,-2.1],'net'],['高いロブで奥へ',[0,-6.3],'lob']],
+ 'ネットより高い球は上から打てる絶好のチャンスで、ロブで逃げるのはもったいない場面です。相手の正面は返されやすいので、体から離れた横のスペースへ鋭く押し込みます。','ネットより上は「叩く」。狙いは体の横'],
+['S',2,'弱点を突く','相手はバックハンドの返球が苦手。自分は余裕を持ってコート中央で上から打てる。',
+ {me:[0,4.2],o:[[0,-3.4]]},{f:[0,-3.5],t:[0,4.2],k:'clear',pk:6},
+ [['相手のバック奥（右奥）へクリア',[2.3,-6.3],'clear'],['相手のフォア奥（左奥）へクリア',[-2.3,-6.3],'clear'],['センターへスマッシュ',[0,-4.0],'smash'],['センターのネット前へドロップ',[0,-2.2],'drop']],
+ '右利きの相手のバック側は、自分から見て右奥です。バック奥に追い込めば、苦しいハイバックか回り込みを強いられ、返球が短く甘くなりやすくなります。','相手の弱点を「攻めの起点」にする'],
+['S',2,'相手が前に残っている','相手がネット前から上げてきたが、相手はまだネット前に残っている。自分は余裕を持って上から打てる。',
+ {me:[0.2,4.0],o:[[0.4,-2.3]]},{f:[0.4,-2.3],t:[0.2,4.0],k:'lob',pk:5.2},
+ [['低く速い攻撃的クリアで頭上を越す',[-2.0,-6.3],'aclear'],['相手の目の前へドロップ',[0.4,-2.2],'drop'],['高くゆっくりしたクリア',[0,-6.3],'clear'],['相手のいる前へ速いドライブ',[0.4,-2.6],'drive']],
+ '相手が前に残っているので、背中側の奥ががら空きです。低く速いクリアなら追いつく前に頭上を越され、相手は苦しい体勢で返すことになります。高く遅いクリアでは戻る時間を与えてしまいます。','相手が前なら「奥」へ。ただし速く'],
+['S',2,'決めにいく一本','相手を右奥（相手のバック奥）へ追い込み、ハイバックの弱いクリアが中央に返ってきた。',
+ {me:[0.3,4.0],o:[[2.2,-5.9]]},{f:[2.2,-5.9],t:[0.3,4.0],k:'clear',pk:4.8,h0:1.6},
+ [['左サイドへスマッシュ',[-2.3,-4.3],'smash'],['相手のいる右奥へクリア',[2.3,-6.3],'clear'],['相手の正面へスマッシュ',[2.0,-5.0],'smash'],['高くゆっくりしたクリアをセンターへ',[0,-6.3],'clear']],
+ '相手は右奥で崩れていて、返球も浅い状態です。逆サイドへのスマッシュなら、相手は斜めに長い距離を動かなければなりません。ドロップでも良いですが、浅く甘い球は角度のある強打で決めきるのが効果的です。','崩した後の甘い球は「逆サイドへ強打」'],
+['S',2,'ハーフ球の処理','相手が奥から、腰の高さのハーフ球を返してきた。相手はまだコートの奥にいる。',
+ {me:[1.4,3.4],o:[[0.2,-5.6]]},{f:[0.2,-5.6],t:[1.4,3.4],k:'drive',h0:1.4,h1:1.0},
+ [['相手から遠い前へ落とす',[-1.6,-2.2],'net'],['高いロブで奥へ',[0,-6.3],'lob'],['相手のいる奥へドライブ',[0.2,-5.6],'drive'],['相手の正面へ強く打つ',[0.2,-5.2],'drive']],
+ '相手が奥にいるので、ネット前は空いています。ハーフ球を前へ落とせば、相手は前後に大きく走らされます。奥へ返すのは、相手の立っている所へ打つことになります。','相手が奥なら前、相手が前なら奥'],
+['S',2,'ドロップに追いついた','相手のドロップに素早く追いついた。シャトルはネットより少し下。相手はドロップを打った後、まだ後ろにいる。',
+ {me:[-0.6,2.4],o:[[0.3,-4.0]]},{f:[0.3,-4.6],t:[-0.6,2.4],k:'drop'},
+ [['ネットすれすれのヘアピン',[-0.5,-2.1],'net'],['高いロブで奥へ',[0,-6.3],'lob'],['相手のいる後ろへドライブ',[0.3,-4.2],'drive'],['ゆるく高めに前へ返す',[-0.4,-2.8],'push']],
+ '相手がまだ後ろにいるなら、前は空いています。早く追いついてヘアピンを打てば、相手は前に走って低い位置から上げるしかありません。同じネット前でも、相手が詰めていればロブ、後ろにいればヘアピンと、相手の位置で正解が変わります。','同じ球でも「相手の位置」で答えが変わる'],
+['S',3,'ブロックへの詰め','スマッシュを打った直後、相手が中央付近でブロックし、ネット前に短く返してきた。相手はブロック後もその場に止まっている。',
+ {me:[-0.7,2.5],o:[[0.8,-3.6]]},{f:[0.8,-3.6],t:[-0.7,2.5],k:'net',h1:0.9},
+ [['素早く詰めてネットすれすれのヘアピン',[-0.5,-2.1],'net'],['高いロブで奥へ',[0,-6.3],'lob'],['中途半端な高さで相手の正面へ',[0.8,-3.4],'push'],['クロスへ低いドライブ',[2.4,-4.4],'drive']],
+ '相手は中央で止まっていて、ネット前までは距離があります。素早く詰めて白帯ぎりぎりのヘアピンを打てば、相手は低い位置から上げるしかなく、次の決め球につながります。ロブを上げると攻撃の流れを手放します。','攻めの流れは「前で切らさない」'],
+['S',3,'予測の逆を突く','左奥（バック側）にクリアが来た。回り込んで頭上で打てる体勢。相手はドロップを警戒して前寄り（ショートサービスライン付近）で構えている。',
+ {me:[-2.2,5.8],o:[[0,-2.8]]},{f:[0,-3.0],t:[-2.2,5.8],k:'clear'},
+ [['クロスクリアで相手のバック奥（右奥）へ',[2.3,-6.3],'clear'],['ストレートドロップ',[-2.2,-2.3],'drop'],['クロスドロップ',[1.8,-2.3],'drop'],['ストレートスマッシュ',[-2.3,-4.6],'smash']],
+ '相手が前寄りで待っているなら、ドロップは読まれています。同じフォームから対角の奥へクリアを打てば、相手は最も長い距離を後ろ向きに走ることになります。','相手の「予測の逆」を、同じフォームから打つ'],
+['S',3,'浅いスマッシュへの反撃','相手が前に詰めながらスマッシュを打ってきた。角度は浅く、肩の高さで受けられる。',
+ {me:[-0.9,3.8],o:[[0.5,-3.0]]},{f:[0.5,-3.0],t:[-0.9,3.8],k:'smash',h1:1.3},
+ [['ドライブで相手の横（左サイド）を抜く',[-2.6,-4.6],'drive'],['ネット前に落とす',[0.5,-2.1],'net'],['高いロブで奥へ',[0,-6.3],'lob'],['相手の正面へ低く返す',[0.5,-3.0],'drive']],
+ '前に詰めた相手の横と後ろは空いています。肩の高さで取れるなら、速いドライブでサイドを抜けば一気に攻守が入れ替わります。詰めている相手の前に落とすと叩かれ、ロブは安全でも受け身が続きます。','浅い球は守りでも「攻め返す」チャンス'],
+['S',3,'癖を読んで動く','右サイドからストレートスマッシュを打った。この相手は、ストレートのスマッシュをストレートのネット前へ短く返す癖がある。どこへ動く？',
+ {me:[2.0,4.8],o:[[2.0,-4.0]]},{f:[2.0,4.8],t:[2.0,-4.0],k:'smash',h1:0.7},
+ [['ストレートのネット前へ詰める',[1.8,2.4],'move'],['その場で次のスマッシュに備える',[2.0,4.8],'move'],['センターのホームへ戻る',[0,3.4],'move'],['クロスのネット前へ動く',[-1.6,2.4],'move']],
+ '相手の返球パターンが分かっているなら、ホームに戻るより予測した場所へ先回りした方が早く取れます。前に詰めて高い打点で触れれば、プッシュやタイトなヘアピンで決められます。読みが外れると奥が空くので、癖がはっきりしているときに使います。','上級者は「ホーム」より「予測」で動く'],
+
+// ---------- ダブルス ----------
+['D',1,'前衛の構え','パートナー（後衛）がスマッシュを打った。前衛の自分はどこで構える？',
+ {me:[0.6,3.6],pt:[0.5,5.3],o:[[-1.4,-3.8],[1.4,-3.8]]},{f:[0.5,5.3],t:[-1.2,-3.8],k:'smash',h1:0.6,h0:2.9},
+ [['ネット前の中央付近でラケットを上げて構える',[0.2,2.4],'move'],['下がってパートナーと横に並ぶ',[-1.4,4.6],'move'],['右サイドライン際',[2.6,2.4],'move'],['コートの真ん中に立つ',[0,3.9],'move']],
+ '前後の攻撃陣形では、前衛はネット前でラケットを上げて構え、相手の甘い返球を叩く役です。スマッシュのコース側にやや寄ると、ストレートの返球を押さえやすくなります。','前衛は「ラケットを上げてネット前」'],
+['D',1,'上げたら横並び','自分がネット前からロブを上げた。このあと相手に攻撃される。2人はどう動く？',
+ {me:[0,2.4],pt:[0,4.8],o:[[0.2,-2.6],[0,-4.6]]},{f:[0,2.4],t:[0,-5.8],k:'lob'},
+ [['2人で左右に並ぶ（サイドバイサイド）',[-1.4,3.8],'move',[1.4,3.8]],['前後のまま、自分は前に残る',[0,2.4],'move',[0,4.8]],['2人ともネット前に出る',[-1.2,2.4],'move',[1.2,2.4]],['2人とも一番後ろまで下がる',[-1.4,6.0],'move',[1.4,6.0]]],
+ 'ロブを上げたら相手のスマッシュが来ます。左右に並んでコートを半分ずつ守るサイドバイサイドにすれば、スマッシュに反応する距離が短くなります。前に残ると横を抜かれやすくなります。','上げたら「横並び」、攻めたら「前後」'],
+['D',1,'ドライブの打ち合い','低いドライブの打ち合い。相手のドライブが自分の正面に来た。相手は前後に並んでいる。',
+ {me:[-0.8,3.4],pt:[1.0,3.6],o:[[0.3,-2.6],[-0.2,-4.8]]},{f:[-0.2,-4.8],t:[-0.8,3.4],k:'drive'},
+ [['相手前衛の横を抜く低いドライブ',[-2.4,-4.2],'drive'],['高いロブで奥へ',[0,-6.2],'lob'],['相手前衛の正面へふわっと返す',[0.3,-2.4],'push'],['ネット際へゆるく落とす',[0.4,-2.1],'net']],
+ 'ドライブの打ち合いでは、先に球を上げた方が守りに回ります。低く速い球で前衛の横を抜けば、相手の後衛に下から取らせることができます。前衛の近くに浮いた球は叩かれます。','ドライブ戦は「上げない・浮かせない」'],
+['D',1,'ダブルスのサービス','ダブルスでサービスを打つ。レシーバーは前寄りで構えている。基本となるサービスは？',
+ {me:[0.5,2.3],pt:[0.3,4.4],o:[[-0.6,-2.5],[-0.2,-4.4]]},null,
+ [['ネットすれすれのショートサービス',[-0.4,-2.05],'net'],['高いロングサービス',[-1.0,-5.8],'lob'],['相手の胸元へ速いドライブサービス',[-0.6,-3.0],'drive'],['ネットより高く浮いたショート',[-0.5,-2.4],'push']],
+ 'ダブルスのロングサービスラインはシングルスより手前にあり、高いサービスは前で構える相手に叩かれやすくなります。基本は白帯すれすれのショートサービスで、相手に上から打たせないことです。','ダブルスのサービスは「低く・短く」'],
+['D',1,'チャンスボール','相手がロブを上げてきた。自分は後衛で、余裕を持ってシャトルの下に入れた。',
+ {me:[0.3,4.8],pt:[0,2.5],o:[[-1.4,-3.6],[1.4,-3.6]]},{f:[-1.4,-3.6],t:[0.3,4.8],k:'lob'},
+ [['スマッシュで攻める',[0,-3.8],'smash'],['高いクリアで奥へ返す',[0,-6.4],'clear'],['ゆっくりしたドロップ',[0,-2.3],'drop'],['相手の正面へドライブ',[-1.4,-3.6],'drive']],
+ 'ダブルスはスマッシュで攻め続けた方が有利です。余裕のある球をクリアで返すと、相手に攻撃のチャンスを渡してしまいます。','上から打てる球は「攻める」'],
+['D',1,'1人が前に出たら','パートナーがネット前の球を取りに前へ出た。自分はどこをカバーする？',
+ {me:[1.6,3.4],pt:[-0.8,2.2],o:[[0,-2.6],[0.2,-4.6]]},{f:[0,-2.6],t:[-0.8,2.2],k:'net'},
+ [['コート後方の中央',[0,4.8],'move'],['パートナーと一緒にネット前',[0.8,2.4],'move'],['右サイドライン際',[2.6,4.0],'move'],['ショートサービスライン付近',[1.0,2.6],'move']],
+ '1人が前に出たら、もう1人は後ろを守って前後の形になります。2人とも前にいると、頭上を越されたら返せません。','1人が前なら、もう1人は「後ろの真ん中」'],
+['D',1,'攻撃の陣形','相手が高く上げてきた。パートナーが後ろでスマッシュを打てる。攻撃の陣形にするには？',
+ {me:[-1.4,3.8],pt:[1.4,3.8],o:[[0,-2.6],[0.2,-4.6]]},{f:[0,-2.6],t:[1.0,5.2],k:'lob'},
+ [['前後に並ぶ（トップアンドバック）',[0,2.5],'move',[1.0,5.2]],['左右に並んだまま',[-1.4,3.8],'move',[1.4,3.8]],['2人とも後ろに下がる',[-1.4,5.6],'move',[1.4,5.6]],['2人ともネット前に出る',[-1.2,2.4],'move',[1.2,2.4]]],
+ '攻撃のときは、後衛が打ち込み、前衛がネット前で甘い返球を叩く前後の陣形が基本です。後衛のスマッシュと前衛の詰めがセットになって得点が生まれます。','攻めたら「前後」'],
+['D',2,'スマッシュの狙い','相手はサイドバイサイドで守っている。自分は後衛でスマッシュを打てる。どこを狙う？',
+ {me:[-0.4,5.0],pt:[0.1,2.5],o:[[-1.4,-3.8],[1.4,-3.8]]},{f:[1.4,-3.8],t:[-0.4,5.0],k:'lob'},
+ [['2人の間（センター）',[0,-3.9],'smash'],['右サイドライン際',[2.8,-4.2],'smash'],['左サイドライン際',[-2.8,-4.2],'smash'],['奥へクリア',[0,-6.4],'clear']],
+ 'センターは「どちらが取るか」で迷いが生まれる場所です。また、真ん中から返す球は角度がつきにくく、前衛が待ち構えやすくなります。サイドはアウトの危険もあります。','迷ったら「センター」'],
+['D',2,'前衛のチャンス','味方のスマッシュを相手がネット前へ返したが、球が浮いた（ネットより上）。前衛の自分が触れる。',
+ {me:[0.2,2.4],pt:[0,5.0],o:[[-1.4,-3.6],[1.4,-3.6]]},{f:[-1.4,-3.6],t:[0.4,2.3],k:'net',h1:1.8},
+ [['2人の間へ鋭くプッシュ',[0,-3.4],'push'],['高いロブで奥へ',[0,-6.3],'lob'],['ヘアピンで前に落とす',[0.3,-2.1],'net'],['後衛に任せて触らない',[0.2,2.4],'move']],
+ '浮いた球を前衛が叩くのが、前後陣形の一番の得点パターンです。2人の間やボディへ鋭く押し込めば、相手はほとんど返せません。','前衛の仕事は「浮いた球を逃さない」'],
+['D',2,'守りからの切り返し','守りの場面。相手後衛のスマッシュをレシーブする。相手前衛はネット前中央、後衛は右奥。',
+ {me:[-1.4,3.8],pt:[1.4,3.8],o:[[0.4,-2.4],[1.2,-5.0]]},{f:[1.2,-5.0],t:[-1.4,3.8],k:'smash',h1:0.9},
+ [['相手前衛の横（左サイド）を抜く低いレシーブ',[-2.5,-4.3],'drive'],['高いロブを深く',[-1.4,-6.4],'lob'],['相手前衛の正面へ短く返す',[0.4,-2.2],'net'],['真ん中へ中途半端な高さで返す',[0.3,-3.4],'push']],
+ 'ロブは安全ですが、また攻撃を受け続けることになります。前衛の横を低く抜けば、相手後衛は下から取るしかなく、攻守交代のチャンスになります。前衛の近くや浮いた球は叩かれます。','守りでも「前衛の横」を通して切り返す'],
+['D',2,'浮いたサービス','相手のショートサービスが少し浮いた。レシーバーの自分は前に飛び込んで高い打点で取れる。',
+ {me:[0.6,2.5],pt:[0.5,4.5],o:[[-0.5,-2.3],[-0.2,-4.4]]},{f:[-0.5,-2.3],t:[0.5,2.2],k:'net',h0:1.0,h1:1.7},
+ [['サイド寄りのハーフへ鋭くプッシュ',[2.4,-3.5],'push'],['高いロブで奥へ',[0,-6.3],'lob'],['ヘアピンで前に返す',[-0.4,-2.1],'net'],['サーバーの正面へ返す',[-0.5,-2.5],'push']],
+ '浮いたサービスは最初の攻撃チャンスです。サーバーと後ろの選手の間、サイド寄りのハーフへ押し込めば、どちらが取るか迷い、返球が上がりやすくなります。ロブを上げると攻撃権を渡してしまいます。','サービスが浮いたら「押し込む」'],
+['D',2,'カットが前に落ちた','相手後衛のカットがネット前に落ちた。自分は前に出てネットより下で取る。相手前衛はネットに詰めている。',
+ {me:[-1.0,2.6],pt:[1.4,3.9],o:[[0.3,-2.4],[1.4,-5.2]]},{f:[1.4,-5.2],t:[-1.0,2.6],k:'drop'},
+ [['相手後衛と逆サイドの奥へ高いロブ',[-2.3,-6.3],'lob'],['ヘアピンで前に返す',[0,-2.1],'net'],['相手前衛の横へ低く返す',[1.6,-3.2],'drive'],['相手後衛の正面へ返す',[1.4,-5.4],'lob']],
+ '相手前衛が詰めているので、ネット前の勝負は不利です。後衛と逆サイドの奥へ高く上げれば、相手後衛を走らせて時間を作れます。ロブの後はサイドバイサイドで構えましょう。','前衛が詰めていたら「ネットで勝負しない」'],
+['D',3,'2人のすき間','相手後衛が左奥からクロススマッシュ。相手前衛は右寄りで、ストレートの返球を待っている。',
+ {me:[1.4,3.8],pt:[-1.4,3.8],o:[[1.0,-2.4],[-1.2,-5.2]]},{f:[-1.2,-5.2],t:[1.4,3.8],k:'smash',h1:0.8},
+ [['クロスのネット前（相手前衛と逆側）へ短く返す',[-1.6,-2.1],'net'],['ストレートのネット前へ返す',[1.4,-2.1],'net'],['ストレートへ高いロブ',[1.4,-6.3],'lob'],['相手前衛の正面へドライブ',[1.0,-2.8],'drive']],
+ '相手前衛はストレートの返球を待っているので、ストレートの前は危険です。クロスのネット前なら前衛は届かず、後衛も奥から前へ長い距離を走ることになります。','前衛が「待っている所」を避け、2人の「すき間」を突く'],
+['D',3,'切り返しを止める','攻撃中、相手がクロスへ速いドライブで切り返してきた。前衛の自分は横に動けば高い打点で触れる。',
+ {me:[-1.1,2.6],pt:[0.6,5.0],o:[[-1.4,-3.8],[1.4,-3.8]]},{f:[1.4,-3.8],t:[-1.1,2.6],k:'drive',h1:1.6},
+ [['2人の間へ押し込む',[0,-3.6],'push'],['相手の正面へ返す',[1.4,-3.8],'drive'],['高く上げて立て直す',[0,-6.2],'lob'],['奥へクリア',[-1.4,-6.3],'clear']],
+ '切り返しのドライブを前衛が止めれば、相手の反撃は失敗に終わります。高い打点から2人の間へ押し込み、攻撃を続けます。上げてしまうと攻守が入れ替わります。','前衛は「切り返しを止める壁」になる'],
+['D',3,'ロングサービスへの返球','相手がロング（フリック）サービスを打ってきた。後ろに下がって上から打てる。サーバーはまだ前に残っている。',
+ {me:[-0.6,5.6],pt:[-0.4,3.0],o:[[0.5,-2.3],[0.2,-4.4]]},{f:[0.5,-2.3],t:[-0.6,5.6],k:'lob',h0:1.0,pk:4.2},
+ [['サーバーと後ろの選手の間（ハーフ）へスマッシュ',[0.3,-3.4],'smash'],['高いクリアで奥へ',[0,-6.4],'clear'],['サーバーのいるネット前へドロップ',[0.5,-2.2],'drop'],['相手の正面へドライブ',[0.2,-4.4],'drive']],
+ 'フリックサービスは相手の奇襲です。上から打てるならクリアで返さず攻めます。サーバーは前、パートナーは後ろにいるため、その間のハーフは責任があいまいな場所になります。','ロングサービスには「上から攻め返す」'],
+['D',3,'ボディを狙う','右側の相手は、サイドに来たスマッシュを速いドライブで切り返すのが得意。この選手を狙ってスマッシュを打つ。',
+ {me:[0.2,4.9],pt:[0,2.5],o:[[-1.4,-3.8],[1.4,-3.8]]},{f:[1.4,-3.8],t:[0.2,4.9],k:'lob'},
+ [['相手の体（利き腕側の肩付近）へ',[1.15,-3.7],'smash'],['相手のサイドライン際へ',[2.8,-4.2],'smash'],['相手の頭上を越えるクリア',[1.4,-6.4],'clear'],['相手の前へゆるいドロップ',[1.4,-2.3],'drop']],
+ '体の正面から利き腕側の肩付近は、ラケットを振るスペースがなく窮屈になります。サイドへの球はラケットを大きく振れるので、得意な切り返しを許してしまいます。','振り切れる選手には「ボディ」で窮屈にさせる'],
+];
+
+const QS = RAW.map((r,i)=>({id:i,m:r[0],lv:r[1],title:r[2],sit:r[3],pl:r[4],inc:r[5],ch:r[6],exp:r[7],pt:r[8]}));
+
+/* ================= 定数 ================= */
+const T={clear:{h0:2.6,h1:2.5,pk:7.0,sp:8},aclear:{h0:2.6,h1:2.4,pk:4.0,sp:12},lob:{h0:0.6,h1:2.5,pk:6.2,sp:7.5},
+  drop:{h0:2.6,h1:0.5,pk:2.4,sp:7},smash:{h0:2.9,h1:0.6,pk:0,sp:24},net:{h0:0.5,h1:0.4,pk:1.85,sp:4},
+  push:{h0:1.8,h1:0.9,pk:0,sp:14},drive:{h0:1.3,h1:1.1,pk:1.7,sp:16}};
+const LABEL={clear:'クリア',aclear:'攻撃クリア',drop:'ドロップ',smash:'スマッシュ',drive:'ドライブ',push:'プッシュ',net:'ヘアピン',lob:'ロブ'};
+const SLABEL={lob:'ロング',net:'ショート',drive:'ドライブ'};
+const ZR={clear:[5.6,6.5],aclear:[5.4,6.3],lob:[5.6,6.5],drop:[2.05,3.1],smash:[2.6,5.0],push:[2.6,4.2],net:[2.0,2.5],drive:[3.6,6.0]};
+const FAM=t=>(t==='lob'||t==='clear')?'high':t;
+const REACH=0.95, REACT=0.12, HSPD=4.6;
+const LVS={1:{sf:.5,slow:.12,ai:3.0,smart:.45,err:.09,noise:.9},2:{sf:.6,slow:.18,ai:3.6,smart:.7,err:.05,noise:.6},3:{sf:.74,slow:.26,ai:4.2,smart:.88,err:.025,noise:.35}};
+function mkLV(n){return Object.assign({},LVS[n],{sf:LVS[n].sf*(+cfg.spd||1),slow:+cfg.slow||0.18});}
+const SPDN={'0.6':'ゆっくり','0.8':'やや遅い','1':'ふつう','1.25':'速い'},SLOWN={'0.08':'強','0.18':'中','0.4':'弱','1':'なし'};
+const SPDL=[['0.6','ゆっくり'],['0.8','やや遅い'],['1','ふつう'],['1.25','速い']],SLOWL=[['0.08','強'],['0.18','中'],['0.4','弱'],['1','なし']];
+const ROSTER=[["小Y", 2, "シングルス", [40.8, 43.5, 46.2, 39.2, 60.3, 52.0, 54.3, 56.5]], ["後Y", 2, "シングルス", [31.8, 28.5, 38.0, 24.5, 27.5, 38.4, 32.5, 42.9]], ["今Y", 2, "ダブルス", [52.2, 53.8, 52.4, 55.8, 46.4, 53.6, 56.0, 59.1]], ["佐R", 2, "シングルス", [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]], ["篠S", 2, "シングルス", [38.0, 32.8, 35.8, 30.8, 31.5, 48.1, 41.8, 49.4]], ["髙A", 2, "シングルス", [62.7, 49.9, 54.2, 62.0, 45.8, 59.8, 57.7, 58.6]], ["中H", 2, "ダブルス", [24.6, 47.0, 46.6, 54.1, 42.2, 38.2, 46.9, 59.9]], ["乳S", 2, "ダブルス", [52.2, 46.0, 52.4, 55.9, 63.6, 65.9, 50.8, 53.8]], ["乳H", 2, "ダブルス", [62.7, 56.5, 65.6, 55.9, 60.4, 52.7, 57.8, 64.3]], ["橋H", 2, "シングルス", [41.7, 39.5, 46.9, 43.6, 59.7, 56.1, 57.5, 66.3]], ["宮K", 2, "シングルス", [67.4, 43.6, 43.1, 64.7, 42.4, 58.2, 50.8, 57.0]], ["吉Y", 2, "ダブルス", [36.5, 38.5, 41.5, 32.7, 46.8, 51.7, 48.2, 53.4]], ["工F", 1, "ダブルス", [18.0, 16.6, 16.3, 29.0, 15.8, 30.3, 18.7, 24.9]], ["田A", 1, "ダブルス", [18.0, 14.5, 16.3, 17.1, 15.8, 16.1, 18.7, 19.8]], ["永J", 1, "ダブルス", [30.2, 25.0, 25.0, 18.8, 19.3, 26.7, 25.7, 28.5]], ["中h", 1, "ダブルス", [47.7, 46.0, 42.7, 47.3, 37.3, 39.2, 47.0, 49.9]], ["橋M", 1, "ダブルス", [24.7, 29.3, 27.5, 29.3, 24.0, 32.0, 30.3, 33.9]], ["別K", 1, "ダブルス", [18.0, 23.6, 28.5, 20.3, 19.3, 23.3, 22.2, 28.4]], ["本S", 1, "シングルス", [23.2, 25.3, 22.1, 25.5, 24.5, 44.4, 25.7, 28.4]], ["峯R", 1, "シングルス", [25.7, 24.0, 29.3, 24.5, 20.5, 28.9, 24.9, 28.5]], ["峰H", 1, "シングルス", [11.0, 12.8, 11.0, 11.3, 10.5, 11.0, 10.5, 13.1]], ["宮k", 1, "ダブルス", [21.5, 21.5, 28.5, 25.8, 17.5, 19.6, 20.5, 32.0]], ["千H", 1, "シングルス", [28.5, 18.5, 19.8, 21.4, 17.8, 31.6, 27.0, 26.0]], ["上K", 1, "シングルス", [20.2, 17.0, 15.3, 17.8, 15.3, 25.2, 17.5, 17.8]]];
+const KEYS=['fw','acc','atk','def','net','sta','tac','game'];
+const KN={fw:'フットワーク',acc:'ショット精度',atk:'攻撃力',def:'守備力',net:'ネット前',sta:'体力',tac:'戦術理解',game:'試合力'};
+const KS={fw:'足',acc:'精',atk:'攻',def:'守',net:'前',sta:'体',tac:'戦',game:'試'};
+const toR=v=>Math.round(Math.min(99,15+v*1.25));
+const CHARS={};
+CHARS.std={id:'std',name:'標準選手',sub:'オール50',st:Object.fromEntries(KEYS.map(k=>[k,50]))};
+const ADJ={};
+const SEX={"小Y": "f", "後Y": "f", "今Y": "m", "佐R": "m", "篠S": "m", "髙A": "m", "中H": "f", "乳S": "m", "乳H": "m", "橋H": "f", "宮K": "m", "吉Y": "f", "工F": "f", "田A": "m", "永J": "m", "中h": "m", "橋M": "m", "別K": "f", "本S": "f", "峯R": "f", "峰H": "m", "宮k": "m", "千H": "m", "上K": "f"};
+ROSTER.forEach((r,i)=>{CHARS['m'+i]={id:'m'+i,ev:r[2],sx:SEX[r[0]]||'m',name:r[0],sub:r[1]+'年・'+r[2]+(r[3].every(v=>!v)?'・記録なし':''),g:r[1],club:true,st:Object.fromEntries(KEYS.map((k,j)=>[k,Math.min(99,Math.round(toR(r[3][j])*0.8*(ADJ[r[0]]||1)))]))};});
+[['c1','ビギナー','初心者',30,{}],['c2','地区大会（2部ベスト16）','バランス型',48,{}],['c3','胆振大会・守備型','拾って粘る',62,{def:82,fw:74,sta:78,atk:46}],['c4','胆振大会・攻撃型','スマッシュで押す',62,{atk:86,acc:56,def:48}],['c5','全道大会レベル','穴のないオールラウンダー',82,{}],['c6','全道トップ','ほぼミスしない',94,{}]]
+ .forEach(([id,n,sub,b,o])=>{const st=Object.assign(Object.fromEntries(KEYS.map(k=>[k,b])),o);
+   CHARS[id]={id,name:'CPU女子 '+n,sub:'女子・'+sub,cpu:true,sx:'f',st};
+   CHARS[id+'m']={id:id+'m',name:'CPU男子 '+n,sub:'男子・'+sub,cpu:true,sx:'m',st:Object.fromEntries(KEYS.map(k=>[k,Math.min(99,Math.round(st[k]*1.2))]))};});
+const SGL_IN_DBL=0.9;
+function dblPenalty(c,fmt){return !!c.club&&fmt==='D'&&c.ev==='シングルス';}
+function effSt(id,fmt){const c=CHARS[id]||CHARS.std;if(!dblPenalty(c,fmt))return c.st;return Object.fromEntries(KEYS.map(k=>[k,Math.round(c.st[k]*SGL_IN_DBL)]));}
+function applyChar(p,id,fmt){const c=CHARS[id]||CHARS.std;p.ch=c;p.base=effSt(id,fmt);p.mom=0;recalcP(p);}
+function recalcP(p){p.st=Object.fromEntries(KEYS.map(k=>[k,Math.max(5,Math.min(99,p.base[k]+(p.mom||0)))]));p.spd=3.3+p.st.fw/100*2.3;p.reach=0.82+p.st.def/100*0.28;}
+const RISK={smash:.10,aclear:.06,drop:.08,net:.10,push:.07,drive:.05,clear:.03,lob:.03};
+function accFor(p,t){const s=p.st;return(t==='net'||t==='push')?s.net:t==='smash'?(s.acc+s.atk)/2:s.acc;}
+function pressureMul(p){if(!G||G.kind!=='rally')return 1;const late=Math.max(G.score[0],G.score[1])>=G.target-3;return late?Math.max(0.7,1.45-p.st.game/110):1;}
+function rallyMul(){if(!G||G.kind!=='rally'||!G.Lstar)return 1;const r=(G.rallyLen||0)/G.Lstar;return 1+r*r*1.3;}
+function teamAvg(side){const ps=activeOn(side).filter(p=>p.st);if(!ps.length)return 50;return ps.reduce((t,p)=>t+KEYS.reduce((u,k)=>u+p.st[k],0)/KEYS.length,0)/ps.length;}
+function calcLstar(){const gap=Math.abs(teamAvg(1)-teamAvg(-1));const bal=Math.max(0,1-gap/40);return 5+bal*4.5;}
+const RRISK={smash:.08,push:.07,drive:.04,drop:.04,net:.05,aclear:.03,clear:.015,lob:.015};
+function recvMissP(p,t){const a=1.3-p.st.def/100;return RRISK[t]*a*a*1.4*pressureMul(p)*rallyMul();}
+function errP(p,t,stretched,extra){const a=1.3-accFor(p,t)/100;return RISK[t]*a*a*1.4*(stretched?2:1)*pressureMul(p)*(1+(extra||0))*rallyMul();}
+function shortfall(p,t,tg){if(!['clear','lob','aclear','drive'].includes(t))return 0;const sh=Math.random()*Math.pow(1-accFor(p,t)/100,1.5)*3.2;const s=Math.sign(tg.z);tg.z=s*Math.max(2.4,Math.abs(tg.z)-sh);return sh;}
+function scatter(p,t,tg,mul){const k=Math.pow(1-accFor(p,t)/100,1.3)*1.2*(mul||1);const n=()=>Math.random()+Math.random()-1;tg.x+=n()*k*1.4;tg.z+=n()*k*((t==='net'||t==='drop')?0.4:1.0);if(Math.abs(tg.z)<0.6)tg.z=Math.sign(tg.z)*0.6;return tg;}
+function spMul(p,t){if(!p||!p.st)return 1;if(t==='smash')return 0.78+p.st.atk/220;if(t==='drive'||t==='push')return 0.88+p.st.atk/400;return 1;}
+function oppTimeF(ps){const a=ps.filter(p=>p.base);if(!a.length)return 1;const avg=a.reduce((t,p)=>t+KEYS.reduce((u,k)=>u+p.base[k],0)/KEYS.length,0)/a.length;return 0.75+avg/100*0.6;}
+const HES_LIM=5;
+function slowEff(){
+  const s=LV.slow;if(s>=1)return 1;const m=PL.me.st;
+  let f=(1.4-m.fw/100*0.8)*(1.15-m.def/100*0.3);
+  if(G.kind==='rally'){
+    f*=oppTimeF(activeOn(-1));
+    const prog=Math.max(G.score[0],G.score[1])/G.target;f*=1+prog*0.6*(1.1-m.sta/100);
+    if(SH&&SH.hp&&SH.hp.st&&SH.side===-1&&(SH.type==='smash'||SH.type==='push'))f*=1+Math.max(0,(SH.hp.st.atk-m.def)/150);
+    if(SH&&SH.wf)f*=1.3-m.tac/100*0.4;
+  }
+  return Math.min(0.95,s*f*0.3); // 0.3 = 基準時間を当初の約3.3倍に延長
+}
+function movingDir(p){const v=p.vel;if(!v||Math.hypot(v.x,v.z)<0.8)return null;return v;}
+function wrongFooted(p,tg){const v=movingDir(p);if(!v)return false;const pos=p.g.position;return((tg.x-pos.x)*v.x+(tg.z-pos.z)*v.z)<0;}
+function staminaMul(p){if(!G||G.kind!=='rally'||!p.st)return 1;const lim=5+p.st.sta/10;return Math.max(0.72,1-Math.max(0,(G.rallyLen||0)-lim)*0.03);}
+const GCLS={'◎':'g-best','○':'g-good','△':'g-meh','×':'g-bad','・':'g-info'};
+const LVN={1:'初級',2:'中級',3:'上級',0:'すべて'},MN={S:'シングルス',D:'ダブルス',A:'両方'};
+
+/* ================= Three.js シーン ================= */
+const cv=document.getElementById('cv'), stage=document.getElementById('stage');
+const renderer=new THREE.WebGLRenderer({canvas:cv,antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));
+const scene=new THREE.Scene();
+const cam=new THREE.PerspectiveCamera(42,1,0.1,200);
+scene.add(new THREE.HemisphereLight(0xffffff,0x8a7a60,0.85));
+const sun=new THREE.DirectionalLight(0xffffff,0.55); sun.position.set(4,12,8); scene.add(sun);
+function readCss(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim();}
+function applyTheme(){renderer.setClearColor(new THREE.Color(readCss('--stage')||'#dfe7e2'));}
+applyTheme();
+try{matchMedia('(prefers-color-scheme: dark)').addEventListener('change',applyTheme);}catch(e){}
+new MutationObserver(applyTheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+function canvasTex(w,h,draw){const c=document.createElement('canvas');c.width=w;c.height=h;draw(c.getContext('2d'),w,h);const t=new THREE.CanvasTexture(c);t.anisotropy=4;return t;}
+const woodTex=canvasTex(512,512,(x,w,h)=>{x.fillStyle='#c79c6b';x.fillRect(0,0,w,h);for(let i=0;i<16;i++){x.fillStyle=i%2?'rgba(120,70,30,.10)':'rgba(255,240,210,.08)';x.fillRect(0,i*32,w,32);x.fillStyle='rgba(90,50,20,.25)';x.fillRect(0,i*32,w,1);}});
+woodTex.wrapS=woodTex.wrapT=THREE.RepeatWrapping;woodTex.repeat.set(6,6);
+const floor=new THREE.Mesh(new THREE.PlaneGeometry(40,40),new THREE.MeshLambertMaterial({map:woodTex}));floor.rotation.x=-Math.PI/2;scene.add(floor);
+const mat=new THREE.Mesh(new THREE.PlaneGeometry(7.3,14.8),new THREE.MeshLambertMaterial({color:0x2c7a55}));mat.rotation.x=-Math.PI/2;mat.position.y=0.004;scene.add(mat);
+const lineMat=new THREE.MeshBasicMaterial({color:0xf4f6f2});
+function line(x1,z1,x2,z2){const lw=0.04,dx=x2-x1,dz=z2-z1;const len=Math.hypot(dx,dz)+lw;const m=new THREE.Mesh(new THREE.PlaneGeometry(dx===0?lw:len,dz===0?lw:len),lineMat);m.rotation.x=-Math.PI/2;m.position.set((x1+x2)/2,0.008,(z1+z2)/2);scene.add(m);}
+const HW=3.05,SW=2.59,HL=6.7,SS=1.98,LS=5.94;
+line(-HW,-HL,-HW,HL);line(HW,-HL,HW,HL);line(-SW,-HL,-SW,HL);line(SW,-HL,SW,HL);
+[-HL,HL,-SS,SS,-LS,LS].forEach(z=>line(-HW,z,HW,z));line(0,SS,0,HL);line(0,-SS,0,-HL);
+const postMat=new THREE.MeshLambertMaterial({color:0x2c3a33});
+[-HW-0.05,HW+0.05].forEach(x=>{const p=new THREE.Mesh(new THREE.CylinderGeometry(0.035,0.035,1.55,10),postMat);p.position.set(x,0.775,0);scene.add(p);});
+const netTex=canvasTex(512,64,(x,w,h)=>{x.strokeStyle='rgba(20,25,22,.75)';x.lineWidth=1.2;for(let i=0;i<=w;i+=8){x.beginPath();x.moveTo(i,0);x.lineTo(i,h);x.stroke();}for(let j=0;j<=h;j+=8){x.beginPath();x.moveTo(0,j);x.lineTo(w,j);x.stroke();}});
+const net=new THREE.Mesh(new THREE.PlaneGeometry(6.1,0.76),new THREE.MeshBasicMaterial({map:netTex,transparent:true,side:THREE.DoubleSide,depthWrite:false}));net.position.set(0,1.17,0);scene.add(net);
+const tape=new THREE.Mesh(new THREE.BoxGeometry(6.1,0.05,0.02),new THREE.MeshBasicMaterial({color:0xffffff}));tape.position.set(0,1.53,0);scene.add(tape);
+
+function rr(x,X,Y,W,H,R){x.beginPath();x.moveTo(X+R,Y);x.arcTo(X+W,Y,X+W,Y+H,R);x.arcTo(X+W,Y+H,X,Y+H,R);x.arcTo(X,Y+H,X,Y,R);x.arcTo(X,Y,X+W,Y,R);x.closePath();}
+function textSprite(txt,bg,fg,s=1){const tex=canvasTex(256,96,(x,w,h)=>{x.font="700 44px 'Zen Kaku Gothic New','Hiragino Sans',sans-serif";const tw=Math.min(244,x.measureText(txt).width+40);x.fillStyle=bg;rr(x,(w-tw)/2,14,tw,68,34);x.fill();x.fillStyle=fg;x.textAlign='center';x.textBaseline='middle';x.fillText(txt,w/2,50);});
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,depthTest:false,transparent:true}));sp.scale.set(1.15*s,0.43*s,1);sp.renderOrder=10;return sp;}
+
+function makePlayer(col,label){
+  const g=new THREE.Group(), m=new THREE.MeshLambertMaterial({color:col});
+  const skin=new THREE.MeshLambertMaterial({color:0xf0c9a0}), dark=new THREE.MeshLambertMaterial({color:0x262c30});
+  const body=new THREE.Group();g.add(body);
+  const add=(geo,mt,x,y,z,rz)=>{const o=new THREE.Mesh(geo,mt);o.position.set(x,y,z);if(rz)o.rotation.z=rz;body.add(o);return o;};
+  add(new THREE.CylinderGeometry(.19,.23,.72,16),m,0,1.12,0);
+  add(new THREE.CylinderGeometry(.23,.24,.22,16),dark,0,.68,0);
+  add(new THREE.CylinderGeometry(.075,.068,.6,10),skin,-.1,.32,0);
+  add(new THREE.CylinderGeometry(.075,.068,.6,10),skin,.1,.32,0);
+  add(new THREE.SphereGeometry(.15,16,12),skin,0,1.66,0);
+  add(new THREE.CylinderGeometry(.05,.045,.55,8),m,.29,1.55,0,-.35);
+  add(new THREE.CylinderGeometry(.05,.045,.5,8),m,-.27,1.2,0,.25);
+  add(new THREE.CylinderGeometry(.014,.014,.34,6),dark,.39,1.97,0,-.2);
+  const head=add(new THREE.TorusGeometry(.12,.013,6,24),dark,.44,2.22,0,-.2);
+  const strings=new THREE.Mesh(new THREE.CircleGeometry(.115,20),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.35,side:THREE.DoubleSide}));strings.position.copy(head.position);strings.rotation.z=-.2;body.add(strings);
+  const sh=new THREE.Mesh(new THREE.CircleGeometry(.36,24),new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:.22}));sh.rotation.x=-Math.PI/2;sh.position.y=.012;g.add(sh);
+  const lb=textSprite(label,col,'#ffffff',1);lb.position.y=2.65;g.add(lb);
+  scene.add(g);g.userData.body=body;return g;
+}
+const PL={
+  me:{id:'me',g:makePlayer('#2f5fd0','あなた'),side:1,human:true,spd:HSPD,reach:REACH},
+  pt:{id:'pt',g:makePlayer('#3f8fe0','味方'),side:1,spd:3.6},
+  o0:{id:'o0',g:makePlayer('#d94e32','相手'),side:-1,spd:3.6},
+  o1:{id:'o1',g:makePlayer('#d94e32','相手'),side:-1,spd:3.6}};
+PL.o0.g.rotation.y=PL.o1.g.rotation.y=Math.PI;
+const ALL=[PL.me,PL.pt,PL.o0,PL.o1];
+ALL.forEach(p=>{p.reach=REACH;p.st=Object.fromEntries(['fw','acc','atk','def','net','sta','tac','game'].map(k=>[k,50]));});
+
+const shuttle=new THREE.Group();
+(function(){const cork=new THREE.Mesh(new THREE.SphereGeometry(.05,12,10),new THREE.MeshLambertMaterial({color:0xf2efe6}));cork.position.z=.05;
+ const skirt=new THREE.Mesh(new THREE.ConeGeometry(.09,.17,16,1,true),new THREE.MeshLambertMaterial({color:0xffffff,side:THREE.DoubleSide}));skirt.rotation.x=-Math.PI/2;skirt.position.z=-.06;
+ const band=new THREE.Mesh(new THREE.TorusGeometry(.052,.01,6,16),new THREE.MeshLambertMaterial({color:0xe8b400}));band.position.z=.01;
+ shuttle.add(cork,skirt,band);shuttle.scale.setScalar(1.8);})();
+scene.add(shuttle);
+const shShadow=new THREE.Mesh(new THREE.CircleGeometry(.13,16),new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:.3}));shShadow.rotation.x=-Math.PI/2;shShadow.position.y=.013;scene.add(shShadow);
+// 狙いマーカー・リーチ円・落下予測
+function flatRing(r1,r2,color,op){const m=new THREE.Mesh(new THREE.RingGeometry(r1,r2,40),new THREE.MeshBasicMaterial({color,transparent:true,opacity:op,side:THREE.DoubleSide,depthWrite:false}));m.rotation.x=-Math.PI/2;return m;}
+const aimMk=new THREE.Group();
+aimMk.add(flatRing(.28,.36,0x2f5fd0,.95));
+[0,Math.PI/2].forEach(r=>{const b=new THREE.Mesh(new THREE.PlaneGeometry(.9,.05),new THREE.MeshBasicMaterial({color:0x2f5fd0,transparent:true,opacity:.9,depthWrite:false}));b.rotation.x=-Math.PI/2;b.rotation.z=r;aimMk.add(b);});
+aimMk.position.y=.02;scene.add(aimMk);aimMk.visible=false;
+const reachMk=flatRing(REACH-.04,REACH,0x2f5fd0,.35);reachMk.position.y=.016;scene.add(reachMk);reachMk.visible=false;
+const landMk=flatRing(.16,.26,0xe8b400,.8);landMk.position.y=.018;scene.add(landMk);landMk.visible=false;
+const dyn=new THREE.Group();scene.add(dyn);
+function clearDyn(){while(dyn.children.length){const o=dyn.children.pop();o.traverse(c=>{if(c.geometry)c.geometry.dispose();if(c.material){if(c.material.map)c.material.map.dispose();c.material.dispose();}});}}
+const V3=(x,y,z)=>new THREE.Vector3(x,y,z);
+const d2=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
+function makeCurve(a,b,pk){
+  let cy=(pk&&pk>Math.max(a.y,b.y))?2*pk-(a.y+b.y)/2:(a.y+b.y)/2;
+  if((a.z>0)!==(b.z>0)&&a.z!==b.z){const t=a.z/(a.z-b.z);const need=(1.68-(1-t)*(1-t)*a.y-t*t*b.y)/(2*(1-t)*t);cy=Math.max(cy,need);}
+  return new THREE.QuadraticBezierCurve3(a,V3((a.x+b.x)/2,cy,(a.z+b.z)/2),b);
+}
+function tube(curve,color,op,r=0.035){const m=new THREE.Mesh(new THREE.TubeGeometry(curve,60,r,8,false),new THREE.MeshBasicMaterial({color,transparent:true,opacity:op,depthWrite:false}));m.renderOrder=5;dyn.add(m);return m;}
+function ring(x,z,color,op=0.9,r1=.2,r2=.29){const m=flatRing(r1,r2,color,op);m.position.set(x,.02,z);dyn.add(m);return m;}
+function placeShuttle(curve,u){const p=curve.getPoint(Math.min(u,.999)),q=curve.getPoint(Math.min(u+.01,1));shuttle.position.copy(p);if(u<1&&p.distanceTo(q)>1e-4)shuttle.lookAt(q);syncShadow();}
+function syncShadow(){const p=shuttle.position;shShadow.position.x=p.x;shShadow.position.z=p.z;shShadow.material.opacity=Math.max(.08,.32-p.y*.04);}
+function shuttleAtHand(p){const g=p.g.position;shuttle.position.set(g.x+0.25*p.side,1.0,g.z-0.2*p.side);shuttle.rotation.set(-Math.PI/2*p.side,0,0);syncShadow();}
+
+/* ================= カメラ ================= */
+const camS={th:0,ph:0.6,r:17},camGoal={th:0,ph:0.6,r:17};
+const VIEWS={back:{th:0,ph:0.6,r:17},top:{th:0,ph:1.42,r:17},side:{th:Math.PI/2,ph:0.42,r:15}};
+let spin=true,zoom=1;
+function setView(v){Object.assign(camGoal,VIEWS[v]);zoom=1;document.querySelectorAll('.views [data-v]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===v));}
+document.querySelectorAll('.views [data-v]').forEach(b=>b.addEventListener('click',()=>{setView(b.dataset.v);spin=false;}));
+function fit(){const w=stage.clientWidth,h=stage.clientHeight;if(!w||!h)return;renderer.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix();}
+new ResizeObserver(fit).observe(stage);fit();
+function updCam(dt){
+  const k=Math.min(1,dt*5);
+  if(spin)camGoal.th+=dt*0.12;
+  camS.th+=(camGoal.th-camS.th)*k;camS.ph+=(camGoal.ph-camS.ph)*k;
+  const rT=camGoal.r*zoom*Math.max(0.82,Math.min(1.25,0.95/cam.aspect));camS.r+=(rT-camS.r)*k;
+  const c=Math.cos(camS.ph);
+  cam.position.set(Math.sin(camS.th)*camS.r*c,camS.r*Math.sin(camS.ph),1.9+Math.cos(camS.th)*camS.r*c);
+  cam.lookAt(0,0.4,1.9);
+}
+
+/* ================= 入力 ================= */
+const keys={};let lastInput=0;
+const ray=new THREE.Raycaster(),ndc=new THREE.Vector2(),ground=new THREE.Plane(new THREE.Vector3(0,1,0),0);
+let pdown=null;
+cv.addEventListener('pointerdown',e=>{pdown={x:e.clientX,y:e.clientY,lx:e.clientX,ly:e.clientY,t:performance.now(),drag:false};cv.setPointerCapture(e.pointerId);});
+cv.addEventListener('pointermove',e=>{if(!pdown)return;const dx=e.clientX-pdown.lx,dy=e.clientY-pdown.ly;
+  if(!pdown.drag&&Math.hypot(e.clientX-pdown.x,e.clientY-pdown.y)>10)pdown.drag=true;
+  if(pdown.drag){spin=false;camGoal.th-=dx*0.006;camGoal.ph=Math.min(1.45,Math.max(0.15,camGoal.ph+dy*0.005));document.querySelectorAll('.views [data-v]').forEach(b=>b.setAttribute('aria-pressed','false'));}
+  pdown.lx=e.clientX;pdown.ly=e.clientY;});
+cv.addEventListener('pointerup',e=>{if(pdown&&!pdown.drag)tap(e);pdown=null;});
+cv.addEventListener('pointercancel',()=>pdown=null);
+cv.addEventListener('wheel',e=>{e.preventDefault();zoom=Math.min(1.6,Math.max(0.55,zoom*(e.deltaY>0?1.08:0.93)));},{passive:false});
+function tap(e){
+  if(!G||!G.active)return;
+  const r=cv.getBoundingClientRect();ndc.set(((e.clientX-r.left)/r.width)*2-1,-((e.clientY-r.top)/r.height)*2+1);
+  ray.setFromCamera(ndc,cam);const p=new THREE.Vector3();if(!ray.ray.intersectPlane(ground,p))return;
+  if(p.z<-0.1){setAim(p.x,p.z);}
+  else if(p.z>0.1&&canMove()){PL.me.dest=V3(Math.max(-3.3,Math.min(3.3,p.x)),0,Math.max(0.4,Math.min(7,p.z)));lastInput=performance.now();}
+}
+document.addEventListener('keydown',e=>{
+  const k=e.key.toLowerCase();
+  if(!document.getElementById('start').hidden||!document.getElementById('result').hidden)return;
+  if(['arrowup','arrowdown','arrowleft','arrowright','w','a','s','d'].includes(k)){keys[k]=true;e.preventDefault();return;}
+  if(k==='j'){setAimX(-1);return;} if(k==='k'){setAimX(0);return;} if(k==='l'){setAimX(1);return;}
+  if('12345678'.includes(k)&&k.length===1){const b=document.querySelectorAll('#shots .shot')[+k-1];if(b&&!b.disabled)b.click();return;}
+  if(k==='enter'){const n=document.getElementById('nextBtn');if(n){e.preventDefault();n.click();}}
+});
+document.addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false;});
+window.addEventListener('blur',()=>{for(const k in keys)keys[k]=false;});
+
+/* 狙い */
+const aim={x:0,z:-4};
+function setAim(x,z){aim.x=Math.max(-3,Math.min(3,x));aim.z=Math.max(-6.6,Math.min(-1.9,z));updAimBtns();}
+function setAimX(s){aim.x=s*(G&&G.fmt==='D'?2.4:2.0);updAimBtns();}
+function updAimBtns(){const s=aim.x<-0.9?-1:aim.x>0.9?1:0;document.querySelectorAll('#aimRow button').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.ax===s));}
+document.querySelectorAll('#aimRow button').forEach(b=>b.addEventListener('click',()=>setAimX(+b.dataset.ax)));
+
+/* ================= UI ヘルパ ================= */
+const $=id=>document.getElementById(id);
+const panel=$('panel');
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+let toastT=null;
+function toast(html,ms=2200){const t=$('toast');t.innerHTML=html;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),ms);}
+let missT=null;
+function showMiss(who,err,detail,title){const el=$('miss');const kind=err==='recv'?'返せなかった':err==='shank'?'フレームショット':err==='net'?'ネットにかかる':'アウト';
+  el.querySelector('b').textContent=(who==='me'?'':who==='pt'?'味方の':'相手の')+(title||'ショットミス')+'！';
+  $('missSub').textContent=kind+(detail?'｜'+detail:'');el.classList.toggle('opp',who==='opp');el.classList.add('show');clearTimeout(missT);missT=setTimeout(()=>el.classList.remove('show'),1800);}
+function dirName(x){return x<-0.9?'左':x>0.9?'右':'センター';}
+function shotName(t,serve){return serve?SLABEL[t]+'サービス':LABEL[t];}
+
+/* ================= ゲーム状態 ================= */
+let G=null, SH=null, timeScale=1, hitNow=false, LV=LVS[2];
+function canMove(){return G&&G.active&&(G.phase==='flight'||(G.kind==='scn'&&G.phase==='flight'));}
+function activeOn(side){return ALL.filter(p=>p.active&&p.side===side);}
+function setPlayers(spec){ // spec: {me,pt,o:[...]}
+  const put=(p,xz)=>{p.active=!!xz;p.g.visible=!!xz;p.dest=null;if(xz)p.g.position.set(xz[0],0,xz[1]);};
+  put(PL.me,spec.me);put(PL.pt,spec.pt);put(PL.o0,spec.o[0]);put(PL.o1,spec.o[1]);
+  $('lgPt').hidden=!spec.pt;
+}
+
+function availableShots(){
+  if(G.phase==='serve')return G.fmt==='D'?['net','lob','drive']:['lob','net','drive'];
+  const y=shuttle.position.y;
+  if(y>=1.9)return['smash','drop','clear','aclear'];
+  if(y>=1.0)return['drive','push','net','lob'];
+  return y>0.6?['lob','net','drive']:['lob','net'];
+}
+let shotKey='';
+const ALLSHOTS=['smash','drop','clear','aclear','drive','push','net','lob'];
+function renderShots(){
+  const live=hitNow,serve=!!(G&&G.phase==='serve');
+  const suit=live?availableShots():[];
+  const key=suit.join()+live+serve;
+  if(key===shotKey)return;shotKey=key;
+  const box=$('shots');
+  if(!box.children.length){box.innerHTML=ALLSHOTS.map((t,i)=>`<button type="button" class="shot" data-t="${t}" disabled><span>${LABEL[t]}</span><kbd>${i+1}</kbd></button>`).join('');
+    box.querySelectorAll('.shot').forEach(b=>b.addEventListener('click',()=>humanShot(b.dataset.t)));}
+  $('ctl').classList.toggle('live',live);
+  box.querySelectorAll('.shot').forEach(b=>{const t=b.dataset.t;b.querySelector('span').textContent=serve&&SLABEL[t]?SLABEL[t]:LABEL[t];
+    b.disabled=!live||(serve&&!SLABEL[t]);b.classList.toggle('fit',live&&suit.includes(t));b.classList.toggle('off',live&&!suit.includes(t)&&!b.disabled);});
+}
+function computeHit(){
+  if(!G||!G.active)return false;
+  if(G.phase==='serve')return G.server==='me';
+  if(G.phase!=='flight'||!SH||SH.done||SH.side!==-1)return false;
+  const s=shuttle.position,m=PL.me.g.position;
+  return s.z>0.05&&s.y>0.15&&s.y<3.05&&d2(s,m)<PL.me.reach;
+}
+
+/* ショット発射 */
+function launch(p,type,from,target,err){
+  const side=p.side;
+  let to=V3(target.x,0.02,target.z),curve;
+  if(err==='out'){if(Math.random()<.5)to.x=Math.sign(to.x||1)*(G.fmt==='D'?3.45:3.0);else to.z=-side*7.15;curve=makeCurve(from,to,T[type].pk);}
+  else if(err==='shank'){to=V3(Math.sign(Math.random()-.5)*(3.8+Math.random()*1.4),0.02,-side*(2.5+Math.random()*3.5));curve=makeCurve(from,to,Math.random()<.5?3.2:5.5);}
+  else if(err==='net'){to=V3(target.x*0.6,0.02,side*0.35);curve=new THREE.QuadraticBezierCurve3(from,V3((from.x+to.x)/2,Math.max(from.y,1.1),(from.z+to.z)/2),to);}
+  else curve=makeCurve(from,to,T[type].pk);
+  const dur=Math.max(0.4,Math.hypot(from.x-to.x,from.z-to.z)/(T[type].sp*LV.sf*spMul(p,type)));
+  SH={curve,dur,t:0,type,side,hitter:p.id,hp:p,to,err,plan:null,done:false};
+  G.phase='flight';G.rallyLen=(G.rallyLen||0)+1;
+  if($('rlen'))$('rlen').textContent='ラリー '+G.rallyLen+'本';
+  if(G.kind==='rally'&&side===-1&&!err&&wrongFooted(PL.me,to)){SH.wf=true;toast('<span class="g g-bad">!</span>逆を突かれた！'+(PL.me.st.tac>=65?'（戦術理解で反応は早め）':''),1400);}
+  if(G.kind==='rally'){planRecv();setBases();}
+}
+function intercept(p,spd){
+  spd=spd||p.spd;let first=null,mb=null,maxS=-9;
+  for(let i=1;i<=60;i++){const u=i/60,q=SH.curve.getPoint(u);
+    if(q.z*p.side<0.15||q.y<0.25||q.y>2.95)continue;
+    const ti=u*SH.dur,need=Math.max(0,d2(p.g.position,q)-p.reach*0.7)/(spd*staminaMul(p))+REACT,sl=ti-need;
+    if(sl>=0.3&&!first)first={u,ti,pt:q,slack:sl};
+    if(sl>maxS){maxS=sl;mb={u,ti,pt:q,slack:sl};}}
+  const r=first||(maxS>=0?mb:null);if(r)r.weak=maxS<0.18;return r;
+}
+function planRecv(){
+  SH.plan=null;SH.meDest=null;
+  if(SH.err==='net')return;
+  if(SH.err==='out'&&Math.random()<0.75&&SH.side===1)return; // CPUはアウトの球を見送る
+  const rs=-SH.side;
+  if(rs===1){
+    const mi=intercept(PL.me,PL.me.spd*0.9);if(mi)SH.meDest=V3(mi.pt.x-0.35,0,mi.pt.z);
+    if(PL.pt.active){const ip=intercept(PL.pt);if(ip){const mp=PL.me.g.position,pp=PL.pt.g.position;
+      if(d2(ip.pt,pp)<d2(ip.pt,mp)-0.25){SH.plan={p:PL.pt,...ip};SH.meDest=null;if(Math.random()<recvMissP(PL.pt,SH.type)){SH.plan.miss=true;SH.plan.rmiss=true;SH.recvFail='味方のレシーブミス';}}}}
+  }else{let best=null;for(const p of [PL.o0,PL.o1])if(p.active){const ip=intercept(p);if(ip&&(!best||ip.slack>best.slack))best={p,...ip};}if(best){if(SH.hp&&SH.hp.st){const a=SH.hp.st,d=best.p.st;let pw=0,pk=0,why='';
+    if(SH.type==='smash'){pk=0.04+(a.atk-d.def)/160;pw=0.06+(a.atk-d.def)/120;why='攻撃力で押し切った';}
+    else if(SH.type==='push'){pk=0.04+(a.net-d.def)/180;pw=0.06+(a.net-d.def)/130;why='ネット前の技術で押し込んだ';}
+    else if(SH.type==='net'||SH.type==='drop'){pk=0.03+(a.net-d.fw)/170;pw=0.04+(a.net-d.fw)/150;why='ネット前の技術で崩した';}
+    const wf=wrongFooted(best.p,SH.to);if(wf){pk+=0.12+a.tac/300-d.tac/400;pw+=0.1;why='相手の逆を突いた（戦術理解）';}
+    const rm=rallyMul();pk*=rm;pw*=Math.sqrt(rm);
+    if(Math.random()<Math.max(0,Math.min(.6,pk))){best.miss=true;SH.kill=why;}
+    else if(Math.random()<recvMissP(best.p,SH.type)){best.miss=true;best.rmiss=true;SH.kill='相手のレシーブミス（守備力'+d.def+'）';}
+    else if(Math.random()<Math.max(0,Math.min(.55,pw)))best.weak=true;}
+  SH.plan=best;}}
+  if(SH.plan){const q=SH.plan.pt;SH.plan.p.dest=V3(q.x-0.3*SH.plan.p.side,0,q.z);}
+}
+function setBases(){
+  for(const side of [1,-1]){
+    const ps=activeOn(side);const ai=ps.filter(p=>!p.human&&!(SH.plan&&SH.plan.p===p));
+    if(!ai.length)continue;
+    if(G.fmt==='S'){ai.forEach(p=>p.dest=V3(0,0,side*3.4));continue;}
+    const down=['smash','drop','push','net'].includes(SH.type);
+    if(SH.type!=='drive')G.form[side]=((side===SH.side)?down:!down)?'tb':'sbs';
+    const tx=SH.to.x;
+    const slots=G.form[side]==='tb'?[V3(tx*0.3,0,side*2.3),V3(tx*0.35,0,side*5.0)]:[V3(-1.3,0,side*3.7),V3(1.3,0,side*3.7)];
+    const other=ps.find(p=>!ai.includes(p));
+    if(other){const op=(SH.plan&&SH.plan.p===other)?other.dest:other.g.position;ai[0].dest=op.distanceTo(slots[0])<op.distanceTo(slots[1])?slots[1]:slots[0];}
+    else{const [a,b]=ai;const s1=a.g.position.distanceTo(slots[0])+b.g.position.distanceTo(slots[1]),s2=a.g.position.distanceTo(slots[1])+b.g.position.distanceTo(slots[0]);a.dest=s1<=s2?slots[0]:slots[1];b.dest=s1<=s2?slots[1]:slots[0];}
+  }
+}
+function aiChoose(p,s,weak){
+  const side=p.side,opp=activeOn(-side).map(o=>o.g.position);
+  const az=Math.abs(s.z),r=Math.random(),oppNet=opp.some(o=>Math.abs(o.z)<2.9);
+  if(weak)return{type:s.y>=1.9?'clear':'lob',target:{x:(Math.random()-.5)*1.6,z:-side*(4.0+Math.random()*0.6)},weak:true};
+  let type;
+  const ag=p.st.atk/100;
+  if(s.y>=1.9){if(az<4.4)type=r<.45+ag*.4?'smash':'drop';else if(oppNet)type='clear';else type=G.fmt==='D'?(r<.3+ag*.5?'smash':r<.85?'drop':'clear'):(r<.1+ag*.4?'smash':r<.62?'drop':'clear');}
+  else if(s.y>=1.0)type=(az<3.0&&s.y>1.4)?'push':(r<.6?'drive':'lob');
+  else type=oppNet?'lob':(r<.3+p.st.net/200?'net':'lob');
+  const W=G.fmt==='D'?2.6:2.2,xs=[-W,0,W],zr=ZR[type];let x=0;
+  if(Math.random()<0.3+p.st.tac*0.0065){const tz=-side*(zr[0]+zr[1])/2;let bd=-1;for(const cx of xs){const d=Math.min(...opp.map(o=>Math.hypot(o.x-cx,o.z-tz)));if(d>bd){bd=d;x=cx;}}}
+  else x=xs[Math.floor(Math.random()*3)];
+  x=Math.max(-W,Math.min(W,x));
+  const tg={x,z:-side*(zr[0]+Math.random()*(zr[1]-zr[0]))};
+  return{type,target:scatter(p,type,tg,0.8)};
+}
+function aiHit(plan){
+  const p=plan.p,s=shuttle.position.clone(),pp=p.g.position;
+  if(d2(pp,s)>p.reach*0.9){const dir=V3(pp.x-s.x,0,pp.z-s.z).normalize();pp.set(s.x+dir.x*0.5,0,s.z+dir.z*0.5);}
+  const c=aiChoose(p,s,plan.weak);
+  shortfall(p,c.type,c.target);let err=null;if(Math.random()<errP(p,c.type,plan.weak))err=accFor(p,c.type)<45&&Math.random()<.4?'shank':Math.random()<.5?'out':'net';
+  if(p.side===-1){
+    if(G.fmt==='S'&&G.rallyLen>1){const m=PL.me.g.position;G.homeWarn=Math.hypot(m.x,m.z-3.4)>1.9;if(G.homeWarn&&!G.homeTipShown){G.homeTipShown=true;addTip('△','相手が打つ瞬間、ホームから離れていた。打ったらすぐ戻ろう',true);}}
+    if(plan.weak)toast('<span class="g g-best">!</span>相手が崩れた！チャンスボール');
+  }else if(p.id==='pt'){feed('・','味方：'+LABEL[c.type]);}
+  if(err&&G.kind==='rally')showMiss(p.side===-1?'opp':'pt',err,LABEL[c.type]+'・'+(c.type==='net'||c.type==='push'?'ネット前':'ショット精度')+Math.round(accFor(p,c.type)));
+  launch(p,c.type,s,c.target,err);
+}
+
+/* 自分のショット */
+function clampTarget(type,serve){
+  const W=G.fmt==='D'?2.85:2.4;let x=Math.max(-W,Math.min(W,aim.x)),z;
+  if(serve){const zr={net:[2.0,2.4],lob:G.fmt==='D'?[5.35,5.85]:[6.0,6.6],drive:[3.4,4.6]}[type];z=Math.max(zr[0],Math.min(zr[1],-aim.z));
+    const sx=-Math.sign(PL.me.g.position.x||1);x=sx*Math.max(0.35,Math.min(W,Math.abs(x)||1.2));}
+  else{const zr=ZR[type];z=Math.max(zr[0],Math.min(zr[1],-aim.z));}
+  return{x,z:-z};
+}
+function humanShot(type){
+  if(!hitNow)return;
+  const serve=G.phase==='serve',m=PL.me.g.position;
+  const from=serve?V3(m.x+0.25,1.0,m.z-0.2):shuttle.position.clone();
+  const stretched=!serve&&d2(from,m)>0.72;
+  const tg=clampTarget(type,serve);
+  if(stretched&&(type==='clear'||type==='lob'))tg.z=-(4.4+Math.random()*0.5);
+  let ev=evaluate(type,tg,from,stretched,serve);
+  let err=null;
+  const unfit=!serve&&!availableShots().includes(type);
+  if(unfit){const y=from.y;ev={g:'×',m:'この高さで'+LABEL[type]+'は無理がある。'+(y>=1.9?'スマッシュ・ドロップ・クリア':y>=1.0?'ドライブ・プッシュ・ヘアピン・ロブ':'ロブ・ヘアピン')+'が合う'};}
+  const hes=(!serve&&G.kind==='rally'&&G.hitStart)?Math.max(0,(performance.now()-G.hitStart)/1000-HES_LIM):0;
+  if(G.kind==='rally'&&!serve&&ev.g!=='×'){const wfp=activeOn(-1).find(o=>wrongFooted(o,tg));if(wfp)ev={g:'◎',m:'相手の逆を突いた！動いている方向と反対へ'};}
+  if(G.kind==='rally'){
+    const me=PL.me,inc=SH&&SH.hp&&SH.hp.st&&!serve&&(SH.type==='smash'||SH.type==='push')?Math.max(0,(SH.hp.st.atk-me.st.def)/80):0;
+    scatter(me,type,tg,1+inc);
+    const sf=serve?0:shortfall(me,type,tg);if(sf>1.2)feed('△',LABEL[type]+'が飛ばなかった（ショット精度'+me.st.acc+'）');
+    if(Math.random()<errP(me,type,stretched,inc)*(unfit?3:1)*(1+Math.min(0.8,hes*0.3))){err=accFor(me,type)<45&&Math.random()<.4?'shank':Math.random()<.5?'out':'net';
+      if(!serve&&SH&&SH.side===-1&&['smash','push','drive','drop','net'].includes(SH.type))G.recvErr=true;
+      G.errMsg=unfit?'この高さで'+LABEL[type]+'は無理があった':hes>0.5?'迷いすぎてミス（'+(hes+HES_LIM).toFixed(1)+'秒）':err==='shank'?'フレームに当たった！（'+(type==='net'||type==='push'?'ネット前':'ショット精度')+Math.round(accFor(me,type))+'）':stretched?'崩れた体勢からの'+LABEL[type]+'はミスしやすい':inc>0.2?'相手の強打（攻撃力'+SH.hp.st.atk+'）に押されてミス':LABEL[type]+'は'+(type==='net'||type==='push'?'ネット前':'ショット精度')+Math.round(accFor(me,type))+'だと難しいショット';}
+    if(staminaMul(me)<0.92&&!G.tiredTip){G.tiredTip=true;feed('・','体力が落ちて動きが遅くなってきた（体力'+me.st.sta+'）');}
+  }
+  hitNow=false;
+  if(err)showMiss('me',err,G.errMsg,G.recvErr?'レシーブミス':null);G.recvErr=false;
+  launch(PL.me,type,from,tg,err);
+  if(G.kind==='rally'){G.evs.push(ev);addTip(ev.g,ev.m,true);toast(`<span class="g ${GCLS[ev.g]}">${ev.g}</span>${esc(shotName(type,serve))}：${esc(ev.m)}`,2600);}
+  else{G.user={type,target:tg,from,curve:SH.curve,stretched,serve,ev};}
+}
+
+/* 判断の評価（コーチ） */
+function evaluate(type,tg,s,stretched,serve){
+  if(serve){
+    if(G.fmt==='S')return type==='lob'?{g:'◎',m:'シングルスは高く深いロングサービスが基本'}:type==='net'?{g:'○',m:'ショートも有効。ただし基本はロング'}:{g:'△',m:'ドライブサービスは読まれると強打される'};
+    return type==='net'?{g:'◎',m:'ダブルスは低く短いショートサービスが基本'}:type==='lob'?{g:'△',m:'ダブルスの高いサービスは叩かれやすい。たまに混ぜると効果的'}:{g:'△',m:'ドライブサービスは奇襲用。多用すると読まれる'};
+  }
+  const opp=activeOn(-1).map(o=>o.g.position),y=s.y,mz=s.z;
+  const oppNet=opp.some(o=>-o.z<2.9),oppDeep=opp.every(o=>-o.z>4.6);
+  const dmin=Math.min(...opp.map(o=>Math.hypot(o.x-tg.x,o.z-tg.z)));
+  if(stretched&&(type==='smash'||type==='aclear'))return{g:'×',m:'崩れた体勢からの攻撃は甘くなる。高いクリアで立て直そう'};
+  if(stretched&&type==='net')return{g:'△',m:'苦しい体勢のヘアピンはミスしやすい。ロブで時間を作ろう'};
+  if(type==='smash'&&mz>5.7)return{g:'△',m:'奥からのスマッシュは威力が落ちる。ドロップやクリアも混ぜよう'};
+  if(y<1.0&&type==='net'&&oppNet)return{g:'×',m:'相手が前に詰めている時のヘアピンは叩かれる。ロブで奥へ'};
+  if(y>=1.5&&mz<3.2&&(type==='lob'||type==='clear'))return{g:'△',m:'ネットより上の球はチャンス。プッシュで叩こう'};
+  if(y>=1.9&&mz<4.6&&type==='clear')return{g:'△',m:'浅く甘い球はチャンス。スマッシュやドロップで攻めよう'};
+  if(G.fmt==='D'&&y>=1.9&&type==='clear')return{g:'△',m:'ダブルスで上から打てる球は攻める。クリアは相手にチャンスを渡す'};
+  if(stretched&&(type==='clear'||type==='lob'))return{g:'◎',m:'苦しい時は高く深く。正しい立て直し'};
+  if(y<1.0&&type==='lob'&&oppNet)return{g:'◎',m:'前に詰めた相手の後ろへロブ。正しい判断'};
+  if(dmin<1.1)return{g:'△',m:'相手の正面に打っている。空いているスペースを狙おう'};
+  if(G.fmt==='D'&&type==='smash'&&opp.length===2){const[a,b]=opp;if((tg.x-a.x)*(tg.x-b.x)<0&&Math.abs(a.z-b.z)<1.3)return{g:'◎',m:'2人の間（センター）を突いた'};}
+  if(oppDeep&&-tg.z<3.3)return{g:'◎',m:'相手が奥にいる時に前へ。空いたスペースを使えた'};
+  if(oppNet&&-tg.z>5)return{g:'◎',m:'相手が前にいる時に奥へ。良い判断'};
+  if(dmin>3.2)return{g:'◎',m:'相手から遠いコースを選べた'};
+  return{g:'○',m:'悪くない。もっと相手から遠い所を狙えるとさらに良い'};
+}
+
+/* ================= 毎フレーム ================= */
+function movePlayers(g){
+  const now=performance.now();
+  for(const p of ALL){if(!p.active)continue;const pos=p.g.position;const px=pos.x,pz=pos.z;let moving=false;
+    if(p.human&&canMove()){
+      let kx=(keys.d||keys.arrowright?1:0)-(keys.a||keys.arrowleft?1:0),kz=(keys.s||keys.arrowdown?1:0)-(keys.w||keys.arrowup?1:0);
+      if(kx||kz){const f=V3(0,0,0);cam.getWorldDirection(f);f.y=0;f.normalize();const r=V3(-f.z,0,f.x);const v=f.multiplyScalar(-kz).add(r.multiplyScalar(kx)).normalize();pos.addScaledVector(v,p.spd*g*staminaMul(p));p.dest=null;lastInput=now;moving=true;}
+      else if(!p.dest&&G.assist&&SH&&SH.meDest&&now-lastInput>500)p.dest=SH.meDest.clone();
+    }
+    if(!moving&&p.dest&&(canMove()||!p.human)&&G.phase!=='serve'){const dx=p.dest.x-pos.x,dz=p.dest.z-pos.z,len=Math.hypot(dx,dz),st=p.spd*g*staminaMul(p);
+      if(len<=st){pos.x=p.dest.x;pos.z=p.dest.z;p.dest=null;}else{pos.x+=dx/len*st;pos.z+=dz/len*st;moving=true;}}
+    pos.x=Math.max(-3.4,Math.min(3.4,pos.x));
+    if(p.side>0)pos.z=Math.max(0.35,Math.min(7.1,pos.z));else pos.z=Math.min(-0.35,Math.max(-7.1,pos.z));
+    if(g>0)p.vel={x:(pos.x-px)/g,z:(pos.z-pz)/g};
+    p.g.userData.body.position.y=moving?Math.abs(Math.sin(now/90))*0.05:0;
+  }
+}
+function updateFlight(g){
+  if(!SH||SH.done)return;
+  SH.t+=g;const u=SH.t/SH.dur;
+  if(u<1)placeShuttle(SH.curve,u);
+  else if(SH.fall){const k=Math.min(1,(SH.t-SH.dur)/0.4);shuttle.position.lerpVectors(SH.fall.a,SH.fall.b,k);syncShadow();if(k>=1)land();}
+  else{placeShuttle(SH.curve,1);land();}
+  if(SH&&!SH.done&&SH.plan&&SH.plan.rmiss&&!SH.plan.shown&&SH.t>=SH.plan.ti){SH.plan.shown=true;showMiss(SH.plan.p.side===-1?'opp':'pt','recv',LABEL[SH.type]+'・守備力'+SH.plan.p.st.def,'レシーブミス');}
+  if(SH&&!SH.done&&SH.plan&&!SH.plan.miss&&SH.t>=SH.plan.ti)aiHit(SH.plan);
+}
+function updateMarkers(){
+  const on=G&&G.active;
+  aimMk.visible=on&&(G.kind==='rally'||G.phase==='serve'||(G.phase==='flight'&&!G.isMove));
+  if(aimMk.visible)aimMk.position.set(aim.x,.02,aim.z);
+  reachMk.visible=on&&PL.me.active;if(reachMk.visible){reachMk.scale.setScalar(PL.me.reach/REACH);reachMk.position.x=PL.me.g.position.x;reachMk.position.z=PL.me.g.position.z;reachMk.material.opacity=hitNow?0.9:0.3;reachMk.material.color.set(hitNow?0xe8b400:0x2f5fd0);}
+  landMk.visible=on&&G.kind==='rally'&&G.assist&&SH&&!SH.done&&SH.side===-1;
+  if(landMk.visible){landMk.position.x=SH.to.x;landMk.position.z=SH.to.z;}
+}
+let statusKey='';
+function updStatus(){
+  const el=$('status');if(!el||!G)return;
+  let txt,go=false;
+  if(G.phase==='serve')txt=G.server==='me'?'あなたのサービス。狙いを決めてショットを選ぼう':'相手のサービス。構えて待とう';
+  else if(G.phase==='flight'){if(hitNow){go=true;const y=shuttle.position.y;txt=y>=1.9?'今だ！上から打てる高い球':y>=1.0?'今だ！中段の球（ドライブ・プッシュ）':'今だ！低い球（ネットより下）';}
+    else if(SH&&SH.side===-1&&!SH.done)txt=SH.plan&&SH.plan.p===PL.pt?'味方が取る。次に備えよう':'落下点へ移動！（自分のコートをタップ）';
+    else txt=G.kind==='rally'?'打ったら構え直そう（シングルスはホームへ）':'シャトルの行方を見よう';}
+  else if(G.phase==='dead')txt='ラリー終了';
+  else if(G.phase==='ready')txt='状況を読んだら「プレー開始」';
+  else txt='';
+  const key=txt+go;if(key===statusKey)return;statusKey=key;el.textContent=txt;el.classList.toggle('go',go);
+}
+let last=performance.now();
+function tick(now){
+  requestAnimationFrame(tick);if(document.hidden){last=now;return;}
+  const dt=Math.min(0.05,(now-last)/1000);last=now;
+  updCam(dt);
+  if(G&&G.active){
+    const wasHit=hitNow;hitNow=computeHit();
+    if(hitNow&&!wasHit)G.hitStart=now;
+    if(hitNow&&G.phase==='flight'){const e=(now-G.hitStart)/1000,lim=HES_LIM;$('tbar').style.width=Math.min(100,e/lim*100)+'%';const ov=e>lim;$('tbarWrap').classList.toggle('over',ov);$('tbarTxt').textContent=ov?'迷うとミスが増える':'';}
+    $('cue').classList.toggle('show',hitNow&&G.phase==='flight');
+    renderShots();
+    const ts=(hitNow&&G.phase==='flight')?slowEff():1;timeScale+=(ts-timeScale)*Math.min(1,dt*14);
+    const g=dt*timeScale;
+    movePlayers(g);updateFlight(g);
+    if(G.kind==='scn'&&G.judgeAt!=null){G.mt+=g;if(G.mt>=G.judgeAt){G.judgeAt=null;scnJudge();}}
+    if(G.timer!=null){G.timer-=dt;if(G.timer<=0){const f=G.after;G.timer=null;G.after=null;f&&f();}}
+    if(G.phase==='serve'&&G.server==='me')shuttleAtHand(PL.me);
+    updateMarkers();updStatus();
+  }
+  renderer.render(scene,cam);
+}
+requestAnimationFrame(tick);
+
+/* ================= 着地・得点 ================= */
+function inBounds(p,recv){return p.z*recv>0&&Math.abs(p.z)<=6.72&&Math.abs(p.x)<=(G.fmt==='D'?3.07:2.61);}
+function land(){
+  if(SH.done)return;SH.done=true;
+  if(G.kind==='scn'){if(!G.isMove)scnJudge();return;}
+  const side=SH.side,inC=SH.err!=='net'&&inBounds(SH.to,-side);
+  const win=inC?side:-side;let msg,g;
+  if(win===1){
+    if(side===1){g='◎';const ev=G.evs[G.evs.length-1];msg=(SH.hitter==='pt'?'味方の':'')+LABEL[SH.type]+'が決まった！'+(SH.kill?' '+SH.kill:(SH.hitter==='me'&&ev&&ev.g==='◎'?' '+ev.m:''));}
+    else{g='・';msg='相手のショットミス（'+(SH.err==='shank'?'フレームショット':SH.err==='net'?'ネット':'アウト')+'）';}
+  }else{
+    if(side===-1){g='×';msg=SH.recvFail?SH.recvFail:'取れなかった… '+(SH.wf?'逆を突かれた':missTip());addTip('△',missTip());}
+    else{g='×';msg=SH.err?'ショットミス（'+(SH.err==='shank'?'フレームショット':SH.err==='net'?'ネット':'アウト')+'）'+(G.errMsg?'：'+G.errMsg:''):'アウト…';}
+  }
+  G.errMsg='';
+  point(win,g,msg);
+}
+function missTip(){
+  if(G.homeWarn)return'打った後、ホームに戻れていなかった';
+  if(SH.type==='smash')return'相手が上から打つ時は、低く構えて早めに反応しよう';
+  if(SH.type==='drop'||SH.type==='net')return'前への球。相手の打点が高い時はドロップも警戒しよう';
+  if(SH.type==='clear'||SH.type==='lob'||SH.type==='aclear')return'球が上がった瞬間に後ろへ動き出そう';
+  return'球が来る前に、予測して動き出そう';
+}
+function point(win,g,msg){
+  G.score[win===1?0:1]++;(G.rl=G.rl||[]).push(G.rallyLen||0);G.server=win===1?'me':'cpu';G.longest=Math.max(G.longest,G.rallyLen||0);
+  if(G.streak&&G.streak.side===win)G.streak.n++;else G.streak={side:win,n:1};
+  G.phase='dead';feed(g,msg);updMomentum();toast(`<span class="g ${GCLS[g]}">${win===1?'得点！':'失点'}</span>${esc(msg)}`,2600);
+  updScore();
+  G.timer=2.2;G.after=()=>{if(gameOver())finishRally();else setupServe();};
+}
+function updMomentum(){
+  const {side,n}=G.streak;
+  for(const p of ALL){if(!p.active||!p.base)continue;const old=p.mom||0;let m=0;
+    if(n>=3){if(p.side===side)m=Math.min(9,2+n+Math.round(p.base.game/25));else m=p.base.game>=65?3:-Math.min(9,Math.round((65-p.base.game)/6)+(n-3));}
+    p.mom=m;recalcP(p);
+    if(p===PL.me&&m!==old){if(m>old&&m>0)feed('◎',(p.side===side?'連続得点で波に乗った！':'連続失点でも気持ちが切れない（試合力'+p.base.game+'）')+' 能力+'+m);
+      else if(m<0)feed('×','連続失点で動揺… 能力'+m+'（試合力'+p.base.game+'）');else if(m===0&&old!==0)feed('・','流れが落ち着いた（能力は元に戻った）');}}
+  updMomBadges();
+}
+function momTxt(p){const m=p.mom||0;return m>0?`<span class="mom up">好調 +${m}</span>`:m<0?`<span class="mom dn">動揺 ${m}</span>`:'';}
+function updMomBadges(){const a=$('momMe'),b=$('momC');if(a)a.innerHTML=momTxt(PL.me);if(b)b.innerHTML=momTxt(PL.o0);}
+function gameOver(){const[a,b]=G.score,t=G.target,cap=t===21?30:t===15?21:t+4;return((a>=t||b>=t)&&Math.abs(a-b)>=2)||a>=cap||b>=cap;}
+
+/* ================= ラリー対戦 ================= */
+function startRally(){
+  LV=mkLV(2);
+  const fmt=cfg.fmt==='A'?'S':cfg.fmt;
+  applyChar(PL.me,cfg.me,fmt);applyChar(PL.pt,cfg.pt,fmt);applyChar(PL.o0,cfg.opp,fmt);applyChar(PL.o1,cfg.opp2,fmt);
+  G={kind:'rally',streak:null,fmt,lv:2,active:true,score:[0,0],target:+cfg.pts,server:'me',evs:[],tips:{},feed:[],longest:0,form:{1:'sbs','-1':'sbs'},assist:cfg.assist};
+  clearDyn();spin=false;setView('back');openPlay();
+  panel.innerHTML=`<div class="tags"><span class="tag">${MN[fmt]}</span><span class="tag">${G.target}点マッチ</span></div>
+   <div class="score"><div><div class="nm"><i class="srv" id="srvMe"></i>${esc(PL.me.ch.name)}${fmt==='D'?'／'+esc(PL.pt.ch.name):''}</div><div class="pts" id="scMe">0</div><div id="momMe"></div></div><div class="mid">VS<br><span id="rlen" style="font-variant-numeric:tabular-nums">ラリー 0本</span></div><div><div class="nm r">${esc(oppName())}<i class="srv" id="srvC"></i></div><div class="pts r" id="scC">0</div><div id="momC" style="text-align:right"></div></div></div>
+   <div class="status" id="status"></div>
+   <div class="live2"><div class="field"><span class="flabel">球の速さ</span><div class="seg sm" id="lvSpd">${SPDL.map(([v,n])=>`<button type="button" data-v="${v}" aria-pressed="${v===cfg.spd}">${n}</button>`).join('')}</div></div><div class="field"><span class="flabel">打つ瞬間のスロー</span><div class="seg sm" id="lvSlow">${SLOWL.map(([v,n])=>`<button type="button" data-v="${v}" aria-pressed="${v===cfg.slow}">${n}</button>`).join('')}</div></div></div>
+   <p class="feedh">コーチのひとこと</p><ul class="feed" id="feed"><li><span class="gb g-info">・</span><span>打つたびに、その判断を評価します</span></li></ul>
+   <ul class="help"><li>自分コートをタップ＝移動／相手コートをタップ＝狙い</li><li>PC：WASD・矢印で移動、1〜8でショット、J/K/Lで狙い</li><li>黄色い円が光ったら、打てる距離です</li></ul>`;
+  bindLive('lvSpd','spd');bindLive('lvSlow','slow');
+  updScore();setupServe();
+}
+function bindLive(id,key){const el=$(id);if(!el)return;el.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;cfg[key]=b.dataset.v;saveCfg();
+  const old=LV.sf;LV=mkLV(G.lv);
+  if(SH&&!SH.done){const r=old/LV.sf;SH.t*=r;SH.dur*=r;if(SH.plan)SH.plan.ti*=r;}
+  el.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x===b));toast((key==='spd'?'球の速さ：'+SPDN[cfg.spd]:'打つ瞬間のスロー：'+SLOWN[cfg.slow]),1400);});}
+function oppName(){return G.fmt==='D'?PL.o0.ch.name.replace('CPU ','')+'／'+PL.o1.ch.name.replace('CPU ',''):PL.o0.ch.name;}
+function updScore(){if(!$('scMe'))return;$('scMe').textContent=G.score[0];$('scC').textContent=G.score[1];$('srvMe').classList.toggle('on',G.server==='me');$('srvC').classList.toggle('on',G.server==='cpu');}
+function setupServe(){
+  SH=null;G.rallyLen=0;G.Lstar=calcLstar();G.tiredTip=false;G.homeWarn=false;G.homeTipShown=false;G.form={1:'sbs','-1':'sbs'};
+  const D=G.fmt==='D';
+  if(G.server==='me'){const R=G.score[0]%2===0,sx=R?0.6:-0.6;
+    setPlayers({me:[sx,D?2.3:2.6],pt:D?[-sx*0.6,4.4]:null,o:D?[[-sx,-2.6],[sx*0.6,-4.4]]:[[-sx,-3.3]]});
+    setAim(-sx*2,D?-2.2:-6.2);G.phase='serve';shuttleAtHand(PL.me);
+  }else{const R=G.score[1]%2===0,sx=R?-0.6:0.6;
+    setPlayers({me:[-sx,D?2.6:3.3],pt:D?[sx*0.6,4.4]:null,o:D?[[sx,-2.3],[-sx*0.6,-4.4]]:[[sx,-2.6]]});
+    G.phase='serve';shuttleAtHand(PL.o0);G.timer=1.4;G.after=cpuServe;}
+  hitNow=false;shotKey='';
+}
+function cpuServe(){
+  const D=G.fmt==='D',r=Math.random();
+  const type=D?(r<.8?'net':'lob'):(r<.85?'lob':'net');
+  const sx=-Math.sign(PL.o0.g.position.x);const rx=sx*(0.6+Math.random()*1.4);
+  const z=type==='net'?2.15:(D?5.6:6.3);
+  const pos=PL.o0.g.position;launch(PL.o0,type,V3(pos.x-0.25,1.0,pos.z+0.2),{x:rx,z},Math.random()<errP(PL.o0,type,false)*0.4?'net':null);
+}
+function addTip(g,m,tipOnly){if(g==='△'||g==='×')G.tips[m]=(G.tips[m]||0)+1;if(!tipOnly)return;feed(g,m);}
+function feed(g,m){
+  if(!G||G.kind!=='rally')return;const ul=$('feed');if(!ul)return;
+  G.feed.unshift({g,m});G.feed=G.feed.slice(0,6);
+  ul.innerHTML=G.feed.map(f=>`<li><span class="gb ${GCLS[f.g]||'g-info'}">${f.g}</span><span>${esc(f.m)}</span></li>`).join('');
+}
+function finishRally(){
+  G.active=false;closePlay();
+  const[a,b]=G.score,won=a>b,c={'◎':0,'○':0,'△':0,'×':0};G.evs.forEach(e=>c[e.g]++);
+  const tips=Object.entries(G.tips).sort((x,y)=>y[1]-x[1]).slice(0,3);
+  const tot=G.evs.length||1,goodPct=Math.round((c['◎']+c['○'])/tot*100);
+  const k='bq_rally_'+G.fmt+cfg.opp;const best=store.get(k,null);if(best==null||goodPct>best)store.set(k,goodPct);
+  $('resCard').innerHTML=`<div><div class="eyebrow">${esc(PL.me.ch.name)} vs ${esc(oppName())}　平均ラリー ${G.rl&&G.rl.length?(G.rl.reduce((a,b)=>a+b,0)/G.rl.length).toFixed(1):0}本・最長 ${G.longest}本</div>
+   <div class="big">${a}<small> - ${b}</small></div><p style="margin:8px 0 0;font-weight:700">${won?'勝利！':'惜しい！'}　良い判断（◎○）の割合 ${goodPct}%</p></div>
+   <div class="stats"><div><b class="g-best">${c['◎']}</b>◎ 最高</div><div><b class="g-good">${c['○']}</b>○ 良い</div><div><b class="g-meh">${c['△']}</b>△ 惜しい</div><div><b class="g-bad">${c['×']}</b>× 要改善</div></div>
+   <div><p class="feedh">次に意識すること</p><div class="review">${tips.length?tips.map(([m,n])=>`<div class="rv"><span class="m ng">${n}</span><div><b>${esc(m)}</b></div></div>`).join(''):'<div class="rv"><span class="m ok">○</span><div><b>大きな課題なし。難易度を上げてみよう</b></div></div>'}</div></div>
+   <div class="row"><button class="btn" id="rAgain" type="button">もう一試合</button><button class="btn sub" id="rTop" type="button">メニューへ</button></div>`;
+  $('result').hidden=false;$('rAgain').onclick=()=>{$('result').hidden=true;startRally();};$('rTop').onclick=toMenu;
+}
+
+/* ================= シーン練習 ================= */
+function startScn(list){
+  const n=Math.min(list.length,+cfg.n);
+  G={kind:'scn',active:true,list:shuffle(list).slice(0,n),i:0,score:0,log:[],src:list,assist:false};
+  spin=false;setView('back');openPlay();scnSetup();
+}
+function scnSetup(){
+  const q=G.list[G.i];G.q=q;G.fmt=q.m;G.lv=q.lv;LV=mkLV(q.lv);applyChar(PL.me,cfg.me,q.m);G.user=null;G.judgeAt=null;G.isMove=q.ch[0][2]==='move';
+  clearDyn();SH=null;hitNow=false;shotKey='';G.lastList=null;
+  setPlayers({me:q.pl.me,pt:q.pl.pt,o:q.pl.o});setAim(0,-4);
+  if(q.inc){shuttle.position.set(q.inc.f[0],T[q.inc.k].h0,q.inc.f[1]);syncShadow();
+    const k=T[q.inc.k];const a=V3(q.inc.f[0],q.inc.h0??k.h0,q.inc.f[1]),b=V3(q.inc.t[0],q.inc.h1??k.h1,q.inc.t[1]);
+    G.incCurve=makeCurve(a,b,q.inc.pk??k.pk);G.incB=b;tube(G.incCurve,readCss('--inc')||'#e8b400',0.35,0.025);}
+  else{G.incCurve=null;shuttleAtHand(PL.me);}
+  G.phase='ready';
+  const ask=G.isMove?'どこへ動く？ → 自分のコートをタップして移動':q.inc?'どう返す？ → 相手コートで狙いを決め、届いた瞬間にショット':'どんなサービスを打つ？ → 狙いを決めてショット';
+  panel.innerHTML=`<div class="tags"><span class="tag">${q.m==='S'?'シングルス':'ダブルス'}</span><span class="tag lv${q.lv}">${LVN[q.lv]}</span><span class="tag">${G.i+1} / ${G.list.length}</span><span class="tag">正解 ${G.score}</span></div>
+   <h2 class="qtitle">${esc(q.title)}</h2><p class="sit">${esc(q.sit)}</p><p class="ask">${esc(ask)}</p>
+   <div class="status" id="status"></div>
+   <div class="row"><button class="btn" id="playBtn" type="button">プレー開始</button></div><div id="fbBox"></div>
+   <ul class="help"><li>薄い黄色の線が、これから来る球の軌道です</li><li>届く距離（黄色い円）に入るとスローになります</li></ul>`;
+  statusKey='';
+  $('playBtn').onclick=scnPlay;$('playBtn').focus({preventScroll:true});
+}
+function scnPlay(){
+  const q=G.q;$('playBtn').disabled=true;
+  if(!q.inc){G.phase='serve';G.server='me';return;}
+  const k=T[q.inc.k],a=G.incCurve.v0,b=G.incB;
+  const dur=Math.max(0.5,Math.hypot(a.x-b.x,a.z-b.z)/(k.sp*LV.sf));
+  const dir=V3(b.x-a.x,0,b.z-a.z).normalize();
+  SH={curve:G.incCurve,dur,t:0,type:q.inc.k,side:G.isMove?1:-1,to:V3(b.x,0.02,b.z),fall:G.isMove?null:{a:b.clone(),b:V3(b.x+dir.x*0.5,0.02,b.z+dir.z*0.5)},done:false};
+  G.phase='flight';
+  if(G.isMove){G.mt=0;G.judgeAt=dur+1.4;toast('自分のコートをタップして、構える位置へ移動！',2600);}
+}
+// 各シーンで「絶対に避けるべき」選択肢の番号（1〜3）。それ以外の妥当な選択は「正解」
+const NG=[[1],[2,3],[1,3],[1,2,3],[],[3],[1,3],[3],[3],[],[1,3],[],[],[3],[2],[1],[1,3],[3],[1,2],[1,2],[2,3],[3],[1],[1,3],[2,3],[3],[1,3],[2,3],[3],[1],[1,3],[],[2],[]];
+const GRADE={best:['最適！','best','最適'],good:['正解','good','正解'],bad:['不正解','bad','不正解']};
+function scnJudge(){
+  if(G.phase==='judged')return;
+  const q=G.q,c0=q.ch[0],u=G.user,ng=NG[q.id]||[];G.phase='judged';hitNow=false;renderShots();
+  let gr,yours,why='';
+  const okC=readCss('--ok')||'#17924f',ngC=readCss('--ng')||'#cf3a3a',gdC='#2f5fd0';
+  if(G.isMove){const m=PL.me.g.position;const dist=c=>Math.hypot(m.x-c[1][0],m.z-c[1][1]);
+    yours=`(${dirName(m.x)}・${m.z<2.9?'前':m.z>4.6?'後ろ':'中央'})に構えた`;
+    if(dist(c0)<1.0)gr='best';
+    else{let bi=0,bd=dist(c0);q.ch.forEach((c,i)=>{if(i&&dist(c)<bd){bd=dist(c);bi=i;}});
+      if(bi&&ng.includes(bi)&&bd<1.4){gr='bad';why=q.ch[bi][0];}else gr='good';}
+    ring(c0[1][0],c0[1][1],okC,.95,.3,.42);if(c0[3]){PL.pt.dest=V3(c0[3][0],0,c0[3][1]);ring(c0[3][0],c0[3][1],okC,.6,.2,.3);}
+    if(gr!=='best')ring(m.x,m.z,gr==='bad'?ngC:gdC,.85,.25,.34);}
+  else{
+    const hp=u?u.from:(q.inc?G.incB.clone():V3(PL.me.g.position.x+.25,1,PL.me.g.position.z-.2));
+    const ct=V3(c0[1][0],0.02,c0[1][1]);
+    tube(makeCurve(hp.clone(),ct,T[c0[2]].pk),okC,.9,.04);ring(ct.x,ct.z,okC,.95);
+    if(!u){gr='bad';yours='届かなかった（打てなかった）';why='シャトルに届かなかった';}
+    else{yours=`${shotName(u.type,u.serve)}（${dirName(u.target.x)}）`;
+      const match=c=>c[2]!=='move'&&FAM(u.type)===FAM(c[2])&&Math.abs(u.target.x-c[1][0])<1.3;
+      if(match(c0))gr='best';
+      else{let bi=0,bd=9;q.ch.forEach((c,i)=>{if(i&&match(c)){const d=Math.abs(u.target.x-c[1][0]);if(d<bd){bd=d;bi=i;}}});
+        const unfit=!u.serve&&u.ev&&u.ev.m.startsWith('この高さで');
+        if(bi&&ng.includes(bi)){gr='bad';why=q.ch[bi][0];}
+        else if(unfit||(u.ev&&u.ev.g==='×')){gr='bad';why=u.ev.m;}
+        else gr='good';}
+      if(gr!=='best'){tube(u.curve,gr==='bad'?ngC:gdC,.65,.03);ring(u.target.x,u.target.z,gr==='bad'?ngC:gdC,.85);}}
+  }
+  const it=G.list[G.i];if(!it._tried){it._tried=true;G.log.push({q,gr});if(gr==='best')G.score++;}
+  const lastQ=G.i===G.list.length-1,[ttl,cls]=GRADE[gr];
+  const msg=gr==='best'?'この場面で一番良い選択です。':gr==='good'?'この選択でも大きな問題はありません。さらに良くするなら「最適」の選択を。':'これは試合で避けるべきパターンです。';
+  $('fbBox').innerHTML=`<div class="fb ${cls}"><h3>${ttl}</h3><p style="font-weight:700">${msg}</p>
+   <dl class="cmp"><dt>あなた</dt><dd>${esc(yours)}</dd><dt>最適</dt><dd>${esc(c0[0])}</dd>${gr==='bad'&&why?`<dt>避ける理由</dt><dd>${esc(why)}</dd>`:''}</dl>
+   <p>${esc(q.exp)}</p><div class="point">${esc(q.pt)}</div>
+   ${u&&!u.serve&&u.ev&&gr!=='bad'?`<p style="font-size:13px"><span class="${GCLS[u.ev.g]}" style="font-weight:700">${u.ev.g}</span> コーチ：${esc(u.ev.m)}</p>`:''}
+   <p style="font-size:12px;color:var(--muted)">緑＝最適のコース${gr==='good'?'、青＝あなたのショット（正解）':gr==='bad'?'、赤＝あなたのショット（不正解）':''}</p>
+   <div class="row"><button class="btn" id="nextBtn" type="button">${lastQ?'結果を見る':'次のシーンへ'}</button><button class="btn sub" id="retryBtn" type="button">もう一度打つ</button></div></div>`;
+  $('nextBtn').onclick=()=>{if(lastQ)finishScn();else{G.i++;scnSetup();}};
+  $('retryBtn').onclick=scnSetup;
+  $('fbBox').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+function finishScn(){
+  G.active=false;closePlay();
+  const n=G.list.length,cB=G.log.filter(l=>l.gr==='best').length,cG=G.log.filter(l=>l.gr==='good').length,cN=G.log.filter(l=>l.gr==='bad').length,pct=Math.round((cB+cG)/n*100);
+  const k='bq_scn_'+cfg.fmt+cfg.lv;const b=store.get(k,null);if(b==null||pct>b)store.set(k,pct);
+  const msg=cN===0&&cB===n?'すべて最適！判断も動きも身についています。':cN===0?'不正解なし！試合で崩れない判断ができています。':pct>=80?'試合で使える判断力です。':pct>=60?'基本はOK。間違えたシーンを「もう一度打つ」で練習しよう。':'まずは初級で「なぜそこへ打つのか」を確認しよう。';
+  $('resCard').innerHTML=`<div><div class="eyebrow">${MN[cfg.fmt]}・${LVN[cfg.lv]}　正答率 ${pct}%（最適＋正解）</div><div class="big">${cB+cG}<small> / ${n}</small></div><p style="margin:8px 0 0;font-weight:700">${msg}</p></div>
+   <div class="stats" style="grid-template-columns:repeat(3,1fr)"><div><b class="g-best">${cB}</b>最適</div><div><b style="color:#2f5fd0">${cG}</b>正解</div><div><b class="g-bad">${cN}</b>不正解</div></div>
+   <div class="review">${G.log.map(l=>`<div class="rv"><span class="m ${l.gr==='bad'?'ng':'ok'}" style="${l.gr==='good'?'color:#2f5fd0':''}">${l.gr==='best'?'◎':l.gr==='good'?'○':'×'}</span><div><b>${esc(l.q.title)}</b><span>${esc(l.q.pt)}</span></div></div>`).join('')}</div>
+   <div class="row"><button class="btn" id="rAgain" type="button">同じ条件でもう一度</button>${G.log.some(l=>l.gr!=='best')?'<button class="btn sub" id="rMiss" type="button">最適以外をもう一度</button>':''}<button class="btn sub" id="rTop" type="button">メニューへ</button></div>`;
+  $('result').hidden=false;const src=G.src,miss=G.log.filter(l=>l.gr!=='best').map(l=>l.q);
+  $('rAgain').onclick=()=>{$('result').hidden=true;startScn(src);};
+  if($('rMiss'))$('rMiss').onclick=()=>{$('result').hidden=true;const keep=cfg.n;cfg.n='99';startScn(miss);cfg.n=keep;};
+  $('rTop').onclick=toMenu;
+}
+
+/* ================= メニュー ================= */
+const store={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v);}catch(e){return d;}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}};
+const cfg=Object.assign({sex:'m',sexO:'',oppLv:'c2',oppM:'',oppM2:'',mode:'rally',fmt:'S',lv:'1',pts:'15',n:'10',assist:true,spd:'1',slow:'0.18',me:'m0',pt:'m2',opp:'c2',opp2:'c2'},store.get('bq2_cfg',{}));
+if(!cfg.sexO)cfg.sexO=cfg.sex;
+if(!cfg.pts15){cfg.pts='15';cfg.pts15=true;}
+function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function scnList(){return QS.filter(q=>(cfg.fmt==='A'||q.m===cfg.fmt)&&(cfg.lv==='0'||String(q.lv)===cfg.lv));}
+function bindSeg(id,key){const el=$(id);el.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;cfg[key]=b.dataset.v;saveCfg();syncMenu();});}
+function saveCfg(){store.set('bq2_cfg',cfg);}
+function syncMenu(){
+  const R=cfg.mode==='rally';
+  if(R&&cfg.fmt==='A')cfg.fmt='S';if(R&&cfg.lv==='0')cfg.lv='1';
+  fillSels();resolveOpp();$('pickOpp').hidden=cfg.oppLv!=='club';
+  $('fmtA').hidden=R;$('lvAll').hidden=R;$('fLv').hidden=R;$('fChar').hidden=!R;$('lbPt').hidden=$('lbOpp2').hidden=cfg.fmt!=='D';drawCmp();$('fPts').hidden=!R;$('fN').hidden=R;$('fAssist').hidden=!R;
+  document.querySelectorAll('#modeSel .mode').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===cfg.mode));
+  [['segSex','sex'],['segSexO','sexO'],['segOpp','oppLv'],['segFmt','fmt'],['segLv','lv'],['segPts','pts'],['segN','n'],['segSpd','spd'],['segSlow','slow']].forEach(([id,k])=>$(id).querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===cfg[k])));
+  $('assist').checked=!!cfg.assist;
+  if(R){$('avail').textContent='CPUと対戦（サービスは得点した側）';const b=store.get('bq_rally_'+cfg.fmt+cfg.opp,null);$('bestTxt').textContent=b!=null?`ベスト判断率：${b}%`:'';$('goBtn').disabled=false;}
+  else{const n=scnList().length;$('avail').textContent=`対象：${n}シーン（全${QS.length}）`;const b=store.get('bq_scn_'+cfg.fmt+cfg.lv,null);$('bestTxt').textContent=b!=null?`ベスト：${b}%`:'';$('goBtn').disabled=!n;}
+}
+$('modeSel').addEventListener('click',e=>{const b=e.target.closest('.mode');if(!b)return;cfg.mode=b.dataset.v;saveCfg();syncMenu();});
+bindSeg('segSex','sex');bindSeg('segSexO','sexO');bindSeg('segOpp','oppLv');bindSeg('segSpd','spd');bindSeg('segSlow','slow');bindSeg('segFmt','fmt');bindSeg('segLv','lv');bindSeg('segPts','pts');bindSeg('segN','n');
+function charOpts(kind){
+  const o=c=>`<option value="${c.id}">${esc(c.name)}（${esc(c.sub)}）</option>`;
+  const grp=sx=>{const N=sx==='m'?'男子':'女子';return[2,1].map(g=>`<optgroup label="部員${N}（${g}年）">${Object.values(CHARS).filter(c=>c.club&&c.g===g&&c.sx===sx).map(o).join('')}</optgroup>`).join('');};
+  const main=(kind==='me'||kind==='pt')?cfg.sex:cfg.sexO,other=main==='m'?'f':'m';
+  const mixed=kind==='pt'||kind==='opp2';
+  return ((kind==='me'||kind==='pt')?`<optgroup label="標準">${o(CHARS.std)}</optgroup>`:'')+grp(main)+(mixed?grp(other):'');
+}
+function validFor(id,kind){const c=CHARS[id];if(!c)return false;if(c.id==='std')return kind==='me'||kind==='pt';if(!c.club)return false;
+  if(kind==='pt'||kind==='opp2')return true;return c.sx===(kind==='me'?cfg.sex:cfg.sexO);}
+function firstMember(sx,skip){const l=Object.values(CHARS).filter(c=>c.club&&c.sx===sx&&!skip.includes(c.id)&&!c.sub.includes('記録なし'));return l.length?l[0].id:'std';}
+const SELS=[['selMe','me','me'],['selPt','pt','pt'],['selOpp','oppM','opp'],['selOpp2','oppM2','opp2']];
+function fillSels(){SELS.forEach(([id,k,kind])=>{const el=$(id);el.innerHTML=charOpts(kind);if(!validFor(cfg[k],kind))cfg[k]=firstMember((kind==='me'||kind==='pt')?cfg.sex:cfg.sexO,SELS.map(x=>cfg[x[1]]));el.value=cfg[k];});}
+SELS.forEach(([id,k])=>$(id).addEventListener('change',e=>{cfg[k]=e.target.value;saveCfg();syncMenu();}));
+function resolveOpp(){if(cfg.oppLv==='club'){cfg.opp=cfg.oppM;cfg.opp2=cfg.oppM2;}else{const id=cfg.oppLv+(cfg.sexO==='m'?'m':'');cfg.opp=id;cfg.opp2=id;}}
+function teamSt(a,b){const f=b?'D':'S',A=effSt(a,f);if(!b)return A;const B=effSt(b,f);return Object.fromEntries(KEYS.map(k=>[k,Math.round((A[k]+B[k])/2)]));}
+function radarSVG(A,B){
+  const R=84,N=KEYS.length,ang=i=>-Math.PI/2+i*2*Math.PI/N,pt=(i,v)=>[Math.cos(ang(i))*R*v/100,Math.sin(ang(i))*R*v/100];
+  const poly=S=>KEYS.map((k,i)=>pt(i,S[k]).map(n=>n.toFixed(1)).join(',')).join(' ');
+  let g='';
+  [20,40,60,80,100].forEach(v=>{g+=`<polygon points="${KEYS.map((k,i)=>pt(i,v).join(',')).join(' ')}" fill="none" stroke="var(--line)" stroke-width="${v===100?1.4:0.8}"/>`;});
+  KEYS.forEach((k,i)=>{const [x,y]=pt(i,100);g+=`<line x1="0" y1="0" x2="${x}" y2="${y}" stroke="var(--line)" stroke-width="0.8"/>`;});
+  [40,80].forEach(v=>{g+=`<text x="3" y="${-R*v/100+3}" font-size="7" fill="var(--muted)">${v}</text>`;});
+  g+=`<polygon points="${poly(B)}" fill="var(--opp)" fill-opacity=".22" stroke="var(--opp)" stroke-width="2" stroke-linejoin="round"/>`;
+  g+=`<polygon points="${poly(A)}" fill="var(--mine)" fill-opacity=".25" stroke="var(--mine)" stroke-width="2" stroke-linejoin="round"/>`;
+  KEYS.forEach((k,i)=>{const[ax,ay]=pt(i,A[k]),[bx,by]=pt(i,B[k]);g+=`<circle cx="${bx}" cy="${by}" r="3" fill="var(--opp)"/><circle cx="${ax}" cy="${ay}" r="3" fill="var(--mine)"/>`;
+    const[lx,ly]=pt(i,118);const anc=Math.abs(lx)<8?'middle':lx>0?'start':'end';const win=A[k]>B[k]?'a':A[k]<B[k]?'b':'';
+    g+=`<text x="${lx.toFixed(1)}" y="${(ly-4).toFixed(1)}" text-anchor="${anc}" font-size="13" font-weight="700" fill="var(--ink)">${KN[k]}</text><text x="${lx.toFixed(1)}" y="${(ly+11).toFixed(1)}" text-anchor="${anc}" font-size="12.5" font-weight="700"><tspan fill="var(--mine)" ${win==='a'?'text-decoration="underline"':''}>${A[k]}</tspan><tspan fill="var(--muted)"> / </tspan><tspan fill="var(--opp)" ${win==='b'?'text-decoration="underline"':''}>${B[k]}</tspan></text>`;});
+  return `<svg class="radar" viewBox="-182 -132 364 262" role="img" aria-label="能力の比較グラフ">${g}</svg>`;
+}
+function sumTxt(A,B){const up=KEYS.filter(k=>A[k]-B[k]>=8).map(k=>KN[k]),dn=KEYS.filter(k=>B[k]-A[k]>=8).map(k=>KN[k]);
+  const avg=S=>KEYS.reduce((t,k)=>t+S[k],0)/KEYS.length;const d=Math.round(avg(A)-avg(B));
+  return `<b>総合 ${d>0?'+'+d+'（有利）':d<0?d+'（不利）':'互角'}</b>`+(up.length?`<span>勝っている：${up.join('・')}</span>`:'')+(dn.length?`<span>負けている：${dn.join('・')}</span>`:'');}
+function drawCmp(){
+  const D=cfg.fmt==='D',A=teamSt(cfg.me,D&&cfg.pt),B=teamSt(cfg.opp,D&&cfg.opp2);
+  const sn=id=>CHARS[id].name.replace(/^CPU(男子|女子) /,'');const nA=D?sn(cfg.me)+'／'+sn(cfg.pt)+' ペア平均':CHARS[cfg.me].name,nB=D?(cfg.oppLv==='club'?sn(cfg.opp)+'／'+sn(cfg.opp2):CHARS[cfg.opp].name)+' ペア平均':CHARS[cfg.opp].name;
+  $('cmpBars').innerHTML=`<div class="cbh"><span class="a">● ${esc(nA)}</span><span class="b">● ${esc(nB)}</span></div>`+radarSVG(A,B)+`<div class="rsum">${sumTxt(A,B)}</div>`
+   +(()=>{const me=CHARS[cfg.me].st,opp=[CHARS[cfg.opp]].concat(D?[CHARS[cfg.opp2]]:[]).map(c=>({base:c.st}));const f=(1.4-me.fw/100*0.8)*(1.15-me.def/100*0.3)*oppTimeF(opp);const lb=f<0.85?['長め','var(--ok)']:f<1.05?['ふつう','var(--accent)']:f<1.25?['短め','var(--warn)']:['かなり短い','var(--ng)'];return`<p class="cbnote" style="font-size:12px;font-weight:700;color:var(--ink)">ショットを選ぶ時間：<span style="color:${lb[1]}">${lb[0]}</span>（相手が強いほど短く、自分のフットワーク・守備力が高いほど長い）</p>`;})()
+   +`<p class="cbnote">フットワーク＝移動の速さ・打つまでの時間／守備力＝届く範囲・失点の防ぎやすさ・時間微増／精度＝狙いのブレ・ミス・飛距離不足／攻撃力＝スマッシュの決定率／ネット前＝ドロップ・ヘアピン・プッシュの決定率／体力＝後半の選択時間と失速／戦術理解＝逆を突いた時の決定率・逆を突かれた時の対応／試合力＝終盤のミスと連続得点・失点時の上下</p>`;
+}
+$('assist').addEventListener('change',e=>{cfg.assist=e.target.checked;saveCfg();});
+$('goBtn').addEventListener('click',()=>{resolveOpp();if(cfg.mode==='rally')startRally();else startScn(scnList());});
+function openPlay(){$('start').hidden=true;$('result').hidden=true;$('ctl').hidden=false;$('quitBtn').hidden=false;}
+function closePlay(){$('ctl').hidden=true;$('quitBtn').hidden=true;$('cue').classList.remove('show');aimMk.visible=reachMk.visible=landMk.visible=false;}
+function toMenu(){if(G)G.active=false;SH=null;closePlay();clearDyn();$('result').hidden=true;$('start').hidden=false;spin=true;idle();syncMenu();}
+$('quitBtn').addEventListener('click',toMenu);
+function idle(){
+  setPlayers({me:[0.3,4.2],pt:[0,2.4],o:[[-1.4,-3.8],[1.4,-3.8]]});
+  shuttle.position.set(0.2,3.2,3.6);shuttle.rotation.set(0,0,0);syncShadow();
+  panel.innerHTML=`<div class="tags"><span class="tag">準備中</span></div><h2 class="qtitle">モードを選んでスタート</h2>
+   <p class="sit"><b>ラリー対戦</b>：CPUと試合をしながら、1球ごとに「その場面でその球は正しかったか」をコーチが評価します。</p>
+   <p class="sit"><b>シーン練習</b>：シングルス${QS.filter(q=>q.m==='S').length}・ダブルス${QS.filter(q=>q.m==='D').length}の場面を、実際に動いて打って正解判定します。</p>`;
+}
+idle();syncMenu();
+})();
+</script>
+
+</body>
+</html>
